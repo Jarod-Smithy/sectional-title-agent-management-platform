@@ -1,0 +1,23 @@
+{
+  "_comment": "Branch-protection-as-code for `main`. Apply with tooling/apply-branch-protection.sh (uses GitHub CLI). Mirrors docs/AI_NATIVE_SDLC_DESIGN.md §3.1 + §12. Replace placeholders before applying.",
+  "required_status_checks": {
+    "strict": true,
+    "contexts": ["All gates"]
+  },
+  "enforce_admins": true,
+  "required_pull_request_reviews": {
+    "dismiss_stale_reviews": true,
+    "require_code_owner_reviews": true,
+    "required_approving_review_count": 0,
+    "_note": "Autonomous merge on green (review count 0) BUT code-owner review is required for human-owned guardrail paths via CODEOWNERS (eval/tests/.github/infra)."
+  },
+  "restrictions": null,
+  "required_linear_history": true,
+  "allow_force_pushes": false,
+  "allow_deletions": false,
+  "block_creations": false,
+  "required_conversation_resolution": true,
+  "required_signatures": true,
+  "lock_branch": false,
+  "allow_fork_syncing": false
+}

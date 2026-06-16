@@ -1,0 +1,58 @@
+name: Bug report
+description: Something is broken. Submitted by an admin from the in-app Dev Console or directly.
+title: "[bug]: "
+labels: ["bug", "sdlc:triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Fields map 1:1 to the in-app Dev Console submit form (docs/AI_NATIVE_SDLC_DESIGN.md §8).
+        The Triage agent reads this issue to write acceptance criteria.
+  - type: input
+    id: summary
+    attributes:
+      label: Summary
+      description: One line describing the bug.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Go to …
+        2. Click …
+        3. See error
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected vs. actual
+    validations:
+      required: true
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options: ["low", "medium", "high", "critical"]
+      default: 1
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options: ["frontend", "services", "sdlc-agents", "infra", "knowledge-base", "unknown"]
+      default: 5
+  - type: textarea
+    id: context
+    attributes:
+      label: Screenshots / context
+      description: Optional. The Dev Console attaches screenshots here.
+  - type: input
+    id: source
+    attributes:
+      label: Submitted via
+      description: Auto-filled by the intake bridge (e.g. dev-console / direct).
+      value: dev-console

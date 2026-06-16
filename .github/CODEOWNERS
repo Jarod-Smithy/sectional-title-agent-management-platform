@@ -1,0 +1,27 @@
+# Code ownership for the AI-native SDLC.
+#
+# Most of the tree can be authored and reviewed by the dev agents. The paths
+# below are HUMAN-OWNED guardrails: changes to gates, eval, tests, security
+# config, and IaC require the human owner's review even though merge is
+# otherwise autonomous on green (docs/AI_NATIVE_SDLC_DESIGN.md §3.1, R2).
+#
+# Solo start: a single human owner. Add an @agents team here later when the
+# dev agents have their own GitHub identity.
+
+# Default owner for everything
+*                           @Jarod-Smithy
+
+# Product code (agents will co-own once they have a team identity)
+/services/                  @Jarod-Smithy
+/frontend/                  @Jarod-Smithy
+/sdlc-agents/               @Jarod-Smithy
+
+# ── Human-owned guardrails (prevent agents weakening their own checks) ──
+/.github/                   @Jarod-Smithy
+/.github/workflows/         @Jarod-Smithy
+/.pre-commit-config.yaml    @Jarod-Smithy
+/eval/                      @Jarod-Smithy
+/tests/                     @Jarod-Smithy
+/infra/                     @Jarod-Smithy
+/CODEOWNERS                 @Jarod-Smithy
+/.github/CODEOWNERS         @Jarod-Smithy

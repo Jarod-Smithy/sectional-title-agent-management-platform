@@ -1,0 +1,52 @@
+# ─── Secrets & credentials (NEVER commit) ──────────────────────────────
+*.pem
+*.key
+*.p12
+.env
+.env.*
+!.env.example
+secrets/
+.secrets.baseline.local
+*.tfvars
+!*.example.tfvars
+
+# ─── Python ────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+dist/
+build/
+
+# ─── Node / TypeScript ─────────────────────────────────────────────────
+node_modules/
+.next/
+out/
+coverage/
+*.tsbuildinfo
+npm-debug.log*
+yarn-error.log*
+
+# ─── Terraform ─────────────────────────────────────────────────────────
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+.terraform.lock.hcl
+
+# ─── Build artifacts / CDK ─────────────────────────────────────────────
+cdk.out/
+*.zip
+
+# ─── OS / editor ───────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+*.swp

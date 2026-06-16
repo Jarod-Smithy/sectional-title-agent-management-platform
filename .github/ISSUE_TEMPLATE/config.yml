@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Submit from the app (admins)
+    url: https://example.invalid/dev-console
+    about: Admins should normally file bugs/features from the in-app Dev Console, which bridges to these templates.
