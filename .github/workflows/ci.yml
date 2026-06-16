@@ -13,6 +13,12 @@ on:
 permissions:
   contents: read
 
+# Force JS actions onto the Node 24 runtime. Our direct actions are already on
+# Node-24 majors; this also opts in transitive actions (e.g. actions/cache@v4
+# pinned inside pre-commit/action) so the Node 20 deprecation warnings clear.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
