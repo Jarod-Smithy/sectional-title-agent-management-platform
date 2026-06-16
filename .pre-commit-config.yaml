@@ -9,6 +9,11 @@ minimum_pre_commit_version: "3.7.0"
 default_install_hook_types: [pre-commit, commit-msg]
 fail_fast: false
 
+# Pin Python-based hooks to 3.12 to match CI (actions/setup-python 3.12).
+# Newer interpreters (e.g. 3.14) break pinned tools like semgrep v1.83.0.
+default_language_version:
+  python: python3.12
+
 repos:
   # ── Hygiene ──────────────────────────────────────────────────────────
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -59,19 +64,33 @@ repos:
       - id: prettier
         types_or: [javascript, jsx, ts, tsx, json, css, markdown, yaml]
 
-  # ── IaC: format + security scan ──────────────────────────────────────
+  # ── IaC: format ──────────────────────────────────────────────────────
+  # IaC security scanning is enforced (blocking) in the CI "Security" job via
+  # Trivy (misconfig) + Checkov; tfsec is EOL (absorbed into Trivy), so it is
+  # intentionally not run here to avoid a dead binary dependency on every host.
   - repo: https://github.com/antonbabenko/pre-commit-terraform
     rev: v1.92.1
     hooks:
       - id: terraform_fmt
-      - id: terraform_tfsec
 
   # ── SAST on staged changes ───────────────────────────────────────────
   - repo: https://github.com/semgrep/semgrep
     rev: v1.83.0
     hooks:
       - id: semgrep
-        args: ["--config", "p/ci", "--config", "p/secrets", "--error", "--skip-unknown-extensions"]
+        # semgrep v1.83.0's vendored opentelemetry imports pkg_resources, which
+        # is only present when setuptools is installed (removed from default
+        # venvs in Python 3.12+). Pin <81 so pkg_resources still ships.
+        additional_dependencies: ["setuptools<81"]
+        args:
+          [
+            "--config",
+            "p/ci",
+            "--config",
+            "p/secrets",
+            "--error",
+            "--skip-unknown-extensions",
+          ]
 
   # ── Conventional Commits (drives SemVer + changelog) ─────────────────
   - repo: https://github.com/alessandrojcm/commitlint-pre-commit-hook

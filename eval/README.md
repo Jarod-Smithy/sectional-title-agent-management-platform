@@ -5,12 +5,12 @@ This is a **blocking CI gate**: a change that regresses grounding/citation accur
 
 Planned contents (P2/P3):
 
-| Path | Purpose |
-|------|---------|
-| `run_eval.py` | CI entrypoint (`--ci`); referenced by `.github/workflows/ci.yml` |
-| `golden/` | Versioned representative cases (intents, expected sources, rubrics) |
-| `metrics/` | Grounding, citation-accuracy, classification, date-correctness, LLM-as-judge |
-| `requirements.txt` | Eval deps |
+| Path               | Purpose                                                                      |
+| ------------------ | ---------------------------------------------------------------------------- |
+| `run_eval.py`      | CI entrypoint (`--ci`); referenced by `.github/workflows/ci.yml`             |
+| `golden/`          | Versioned representative cases (intents, expected sources, rubrics)          |
+| `metrics/`         | Grounding, citation-accuracy, classification, date-correctness, LLM-as-judge |
+| `requirements.txt` | Eval deps                                                                    |
 
 Hard thresholds (§14.3): grounded-citation rate **100%**, fabricated-citation rate **0%**,
 date-version retrieval correctness **100%**.

@@ -64,9 +64,9 @@ no AWS account**. Do the steps in order. Spend stays at **$0** through Stage 3; 
 
 ## Cost tripwires (review monthly)
 
-| Signal | Likely cause | Action |
-|--------|--------------|--------|
-| Zero-spend budget fires | Left the free tier | Find the service in Cost Explorer; confirm intended |
-| Anomaly alert | Runaway agent loop / unexpected service | Check iteration caps (R1); kill the session |
-| Actions minutes warning | Repo went private, or heavy CI | Keep repo public; trim workflow matrix |
-| Bedrock line item climbs | Too many/too-large model calls | Lower iteration cap; Haiku for more steps |
+| Signal                   | Likely cause                            | Action                                              |
+| ------------------------ | --------------------------------------- | --------------------------------------------------- |
+| Zero-spend budget fires  | Left the free tier                      | Find the service in Cost Explorer; confirm intended |
+| Anomaly alert            | Runaway agent loop / unexpected service | Check iteration caps (R1); kill the session         |
+| Actions minutes warning  | Repo went private, or heavy CI          | Keep repo public; trim workflow matrix              |
+| Bedrock line item climbs | Too many/too-large model calls          | Lower iteration cap; Haiku for more steps           |

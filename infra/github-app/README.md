@@ -13,6 +13,7 @@ AgentCore Identity  ──issues short-lived──►  GitHub App installation t
 ```
 
 Principles:
+
 - **No PATs, no long-lived secrets in code or CI.** The GitHub App's private key lives in
   **SSM Parameter Store** as a SecureString (standard tier = **free**); only its **name** is
   referenced here. (Parameter Store is used instead of Secrets Manager to avoid ~$0.40/secret/mo.)
@@ -22,11 +23,11 @@ Principles:
 
 ## Files
 
-| File | Purpose |
-|------|---------|
-| `variables.tf` | Inputs (ARNs, IDs) — **no secret values** |
-| `main.tf` | Stub resources/wiring (commented; filled out in P0 completion) |
-| `terraform.example.tfvars` | Example inputs (placeholders only) |
+| File                       | Purpose                                                        |
+| -------------------------- | -------------------------------------------------------------- |
+| `variables.tf`             | Inputs (ARNs, IDs) — **no secret values**                      |
+| `main.tf`                  | Stub resources/wiring (commented; filled out in P0 completion) |
+| `terraform.example.tfvars` | Example inputs (placeholders only)                             |
 
 > This is a **stub**: it documents the contract and variable surface. No `apply` is run,
 > and no real identifiers are committed. AgentCore Identity itself is provisioned via the

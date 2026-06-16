@@ -119,6 +119,7 @@ jobs:
       - name: gitleaks (full-history secret scan)
         uses: gitleaks/gitleaks-action@v2
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "false"
 
       - name: Semgrep (SAST)
@@ -130,7 +131,7 @@ jobs:
             p/owasp-top-ten
 
       - name: "Trivy (filesystem: deps + misconfig)"
-        uses: aquasecurity/trivy-action@0.24.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
           scanners: vuln,secret,misconfig
