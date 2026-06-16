@@ -64,12 +64,14 @@ repos:
       - id: prettier
         types_or: [javascript, jsx, ts, tsx, json, css, markdown, yaml]
 
-  # ── IaC: format + security scan ──────────────────────────────────────
+  # ── IaC: format ──────────────────────────────────────────────────────
+  # IaC security scanning is enforced (blocking) in the CI "Security" job via
+  # Trivy (misconfig) + Checkov; tfsec is EOL (absorbed into Trivy), so it is
+  # intentionally not run here to avoid a dead binary dependency on every host.
   - repo: https://github.com/antonbabenko/pre-commit-terraform
     rev: v1.92.1
     hooks:
       - id: terraform_fmt
-      - id: terraform_tfsec
 
   # ── SAST on staged changes ───────────────────────────────────────────
   - repo: https://github.com/semgrep/semgrep
