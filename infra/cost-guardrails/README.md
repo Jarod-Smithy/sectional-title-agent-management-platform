@@ -6,11 +6,11 @@ with a bill.
 
 ## What it creates
 
-| Resource | Purpose | Cost |
-|----------|---------|------|
-| `stak-zero-spend` budget | Emails you the moment **any** real charge appears (> $0.01) — your "you left the free tier" alarm | Free (1st 2 budgets) |
-| `stak-monthly-cap` budget | Actual alerts at 50/80/100% + a forecast alert for a small monthly ceiling | Free |
-| Cost Anomaly Detection | ML flags unusual per-service spend (e.g., a runaway Bedrock loop) | Free |
+| Resource                  | Purpose                                                                                           | Cost                 |
+| ------------------------- | ------------------------------------------------------------------------------------------------- | -------------------- |
+| `stak-zero-spend` budget  | Emails you the moment **any** real charge appears (> $0.01) — your "you left the free tier" alarm | Free (1st 2 budgets) |
+| `stak-monthly-cap` budget | Actual alerts at 50/80/100% + a forecast alert for a small monthly ceiling                        | Free                 |
+| Cost Anomaly Detection    | ML flags unusual per-service spend (e.g., a runaway Bedrock loop)                                 | Free                 |
 
 > Budgets and anomaly alerts **notify only** — they do not stop spend. The hard stop
 > is operational: iteration/token caps in the agents (§3.2, R1) and not standing up

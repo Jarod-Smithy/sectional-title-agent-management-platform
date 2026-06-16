@@ -49,7 +49,15 @@ body:
     id: area
     attributes:
       label: Area
-      options: ["frontend", "services", "sdlc-agents", "infra", "knowledge-base", "unknown"]
+      options:
+        [
+          "frontend",
+          "services",
+          "sdlc-agents",
+          "infra",
+          "knowledge-base",
+          "unknown",
+        ]
       default: 5
   - type: input
     id: source

@@ -22,7 +22,9 @@
     "typescript": "^5.5.0"
   },
   "commitlint": {
-    "extends": ["@commitlint/config-conventional"]
+    "extends": [
+      "@commitlint/config-conventional"
+    ]
   },
   "engines": {
     "node": ">=20"

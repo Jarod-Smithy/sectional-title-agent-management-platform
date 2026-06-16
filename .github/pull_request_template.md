@@ -1,6 +1,7 @@
 ## What & why
 
 <!-- Link the issue this PR resolves. Agents: include the originating intake issue. -->
+
 Resolves #
 
 ## Summary
@@ -25,6 +26,7 @@ Resolves #
 ## Agent provenance
 
 <!-- Auto-filled by the SDLC agents: which agent authored / reviewed, and the run id. -->
+
 - Authored by:
 - Reviewed by:
 - SDLC run:

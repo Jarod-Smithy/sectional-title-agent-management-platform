@@ -12,12 +12,12 @@ data** (OQ1).
 > **Greenfield?** Apply `cost-guardrails/` **first** (free) and follow
 > [docs/GREENFIELD_BOOTSTRAP.md](../docs/GREENFIELD_BOOTSTRAP.md).
 
-| Path | Purpose |
-|------|---------|
-| `cost-guardrails/` | Zero-spend budget + monthly cap + anomaly detection (free) — apply first |
-| `github-app/` | GitHub App + AgentCore Identity wiring so agents get short-lived tokens (no PATs) |
-| `environments/` | prod / staging / preview / sandbox (added in product Phase 1, SDLC P3) |
-| `modules/` | Reusable modules (DynamoDB, S3, Step Functions, Lambda, Cognito) |
+| Path               | Purpose                                                                           |
+| ------------------ | --------------------------------------------------------------------------------- |
+| `cost-guardrails/` | Zero-spend budget + monthly cap + anomaly detection (free) — apply first          |
+| `github-app/`      | GitHub App + AgentCore Identity wiring so agents get short-lived tokens (no PATs) |
+| `environments/`    | prod / staging / preview / sandbox (added in product Phase 1, SDLC P3)            |
+| `modules/`         | Reusable modules (DynamoDB, S3, Step Functions, Lambda, Cognito)                  |
 
 > Human-owned via CODEOWNERS. **No secret values are ever committed** — only variable
 > declarations and SSM Parameter Store names.

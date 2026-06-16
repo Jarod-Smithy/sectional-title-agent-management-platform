@@ -10,9 +10,9 @@ test → release — with a human approving only at the production-deploy bounda
 
 ## Documentation
 
-| Doc | Purpose |
-|-----|---------|
-| [docs/SOLUTION_DESIGN.md](docs/SOLUTION_DESIGN.md) | Product architecture, agents, data, security, cost, UX |
+| Doc                                                            | Purpose                                                           |
+| -------------------------------------------------------------- | ----------------------------------------------------------------- |
+| [docs/SOLUTION_DESIGN.md](docs/SOLUTION_DESIGN.md)             | Product architecture, agents, data, security, cost, UX            |
 | [docs/AI_NATIVE_SDLC_DESIGN.md](docs/AI_NATIVE_SDLC_DESIGN.md) | The self-developing software factory (this repo's delivery model) |
 
 ## Monorepo Layout

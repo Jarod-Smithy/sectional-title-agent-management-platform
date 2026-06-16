@@ -33,9 +33,10 @@
 
 ## 1. Goal & Decision Driven
 
-**The decision this system serves**: *Reduce the human's role in software delivery to "Information Officer + Product Owner + final approver", while keeping every change legally/operationally defensible and within a lean budget.*
+**The decision this system serves**: _Reduce the human's role in software delivery to "Information Officer + Product Owner + final approver", while keeping every change legally/operationally defensible and within a lean budget._
 
 The human (admin) does three things only:
+
 1. **Submits** a bug or feature from inside the app.
 2. **Validates** the agents' work in a sandbox (UAT) from inside the app.
 3. **Approves** the production deploy (the single mandatory human gate).
@@ -46,16 +47,16 @@ Everything else — clarification, design, coding, review, security, testing, me
 
 ## 2. Confirmed Decisions
 
-| # | Decision | Choice |
-|---|----------|--------|
-| D1 | Agent runtime / harness | **Amazon Bedrock AgentCore — managed harness (preview)** in **Europe (Frankfurt) `eu-central-1`**. Each agent is declared as model + system prompt + tools; the harness runs the full reasoning→tool→action loop (no orchestration code), giving each session its **own microVM with filesystem + shell access**. Plus Gateway, Identity, Memory, Observability. **AWS Step Functions** coordinates the cross-agent SDLC graph + gates where deterministic control is needed |
-| D2 | Repo topology | **Monorepo** (recommended below) |
-| D3 | Merge autonomy | **Fully autonomous merge on green**; human approval required only for **production deploy** |
-| D4 | Intake system of record | **GitHub Issues** (the app is a thin admin submit UI bridged to Issues) |
-| D5 | Sandbox / preview model | **On-demand ephemeral preview** (serverless, scale-to-zero) + the AgentCore **managed-harness microVM** (filesystem + shell) for build/test; **synthetic data only** |
-| D6 | Security tooling | **OSS stack**: Semgrep (SAST), Trivy (containers/deps), gitleaks (secrets), tfsec/checkov (IaC) |
-| D7 | Dev-tooling budget | **Lean: < $50/mo** (capped agent iterations, GitHub-hosted runner free tier, scale-to-zero infra) |
-| D8 | Documentation home | **This companion doc** (keeps the product design focused) |
+| #   | Decision                | Choice                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| --- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D1  | Agent runtime / harness | **Amazon Bedrock AgentCore — managed harness (preview)** in **Europe (Frankfurt) `eu-central-1`**. Each agent is declared as model + system prompt + tools; the harness runs the full reasoning→tool→action loop (no orchestration code), giving each session its **own microVM with filesystem + shell access**. Plus Gateway, Identity, Memory, Observability. **AWS Step Functions** coordinates the cross-agent SDLC graph + gates where deterministic control is needed |
+| D2  | Repo topology           | **Monorepo** (recommended below)                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| D3  | Merge autonomy          | **Fully autonomous merge on green**; human approval required only for **production deploy**                                                                                                                                                                                                                                                                                                                                                                                  |
+| D4  | Intake system of record | **GitHub Issues** (the app is a thin admin submit UI bridged to Issues)                                                                                                                                                                                                                                                                                                                                                                                                      |
+| D5  | Sandbox / preview model | **On-demand ephemeral preview** (serverless, scale-to-zero) + the AgentCore **managed-harness microVM** (filesystem + shell) for build/test; **synthetic data only**                                                                                                                                                                                                                                                                                                         |
+| D6  | Security tooling        | **OSS stack**: Semgrep (SAST), Trivy (containers/deps), gitleaks (secrets), tfsec/checkov (IaC)                                                                                                                                                                                                                                                                                                                                                                              |
+| D7  | Dev-tooling budget      | **Lean: < $50/mo** (capped agent iterations, GitHub-hosted runner free tier, scale-to-zero infra)                                                                                                                                                                                                                                                                                                                                                                            |
+| D8  | Documentation home      | **This companion doc** (keeps the product design focused)                                                                                                                                                                                                                                                                                                                                                                                                                    |
 
 ---
 
@@ -66,7 +67,7 @@ Everything else — clarification, design, coding, review, security, testing, me
 The product design (SOLUTION_DESIGN.md) gates **every substantive action** behind a human. For **code**, you have chosen autonomous merge on green. This is defensible — code is verifiable by deterministic tests in a way that legal correspondence is not — **but only if the gates are airtight**. Compensating controls:
 
 - **Branch protection on `main`**: required status checks (all gates green), no force-push, linear history, signed commits, no direct pushes (PR-only, including from agents).
-- **Security agent is a *required, blocking* check** — a Critical/High finding fails the merge. Your hard "never" rules are encoded as gates that **cannot** be bypassed (no `--no-verify`, no skipping CI).
+- **Security agent is a _required, blocking_ check** — a Critical/High finding fails the merge. Your hard "never" rules are encoded as gates that **cannot** be bypassed (no `--no-verify`, no skipping CI).
 - **Eval harness gate** (product §14) is a required check — agents cannot merge a change that regresses grounding/citation accuracy.
 - **Production deploy is human-gated** via a GitHub Environment protection rule (the admin is the required reviewer).
 - **Kill switch**: a single repo variable / label (`automation:paused`) halts all agent automation immediately.
@@ -117,13 +118,14 @@ Agent-built code must never touch production data, real Gmail, real Bedrock KB, 
 ```
 
 **Why AgentCore fits the constraints** (region: **Frankfurt `eu-central-1`**):
-- **Managed harness (preview)** declares each agent as *model + system prompt + tools* and runs the full agent loop (reasoning, tool selection, action, streaming) with **no orchestration code**; models are swappable mid-session and any create-time config is overridable per invocation → fast iteration, **scales to zero** → lean cost.
+
+- **Managed harness (preview)** declares each agent as _model + system prompt + tools_ and runs the full agent loop (reasoning, tool selection, action, streaming) with **no orchestration code**; models are swappable mid-session and any create-time config is overridable per invocation → fast iteration, **scales to zero** → lean cost.
 - **Per-session microVM** (filesystem + shell access) **is** the build/test sandbox — agents compile/run/test inside an isolated VM. **Filesystem persistence (preview)** lets an agent suspend mid-task and resume exactly where it left off.
 - **Identity** brokers short-lived GitHub App tokens and AWS credentials → **no stored secrets/PATs** (honours the hard "never" rule).
 - **Gateway** exposes GitHub/AWS/CI operations to agents as governed MCP tools.
 - **Memory** persists project conventions and prior decisions (repo memory) across issues.
 - **Observability** gives traces of every agent action → the SDLC audit trail.
-- **Promotion path**: prototype on the harness, then export to **Strands-based** code for full control; deploy via the **AgentCore CLI** as IaC. *Caveat:* the CLI supports **AWS CDK today; Terraform is "coming soon"* — so AgentCore resources are managed via CDK/CLI while the rest of the AWS estate (SSM Parameter Store, IAM/OIDC, DynamoDB, etc.) stays in Terraform (§6, infra/).
+- **Promotion path**: prototype on the harness, then export to **Strands-based** code for full control; deploy via the **AgentCore CLI** as IaC. _Caveat:_ the CLI supports \*_AWS CDK today; Terraform is "coming soon"_ — so AgentCore resources are managed via CDK/CLI while the rest of the AWS estate (SSM Parameter Store, IAM/OIDC, DynamoDB, etc.) stays in Terraform (§6, infra/).
 
 ---
 
@@ -131,17 +133,17 @@ Agent-built code must never touch production data, real Gmail, real Bedrock KB, 
 
 Mirrors the product's specialist pattern; the **Reviewer is deliberately separate from the Coder** to enforce the Layer-2 "internal critic" independently.
 
-| # | Agent | Responsibility | Key tools (via AgentCore Gateway) | Model |
-|---|-------|----------------|-----------------------------------|-------|
-| 1 | **Orchestrator** | SDLC state machine, gating, retries, kill switch | Step Functions (not an LLM) | — |
-| 2 | **Triage / Planner** | Read Issue, clarify acceptance criteria (may ask admin back in-app), label, decompose into tasks | `get_issue`, `comment_issue`, `label`, `ask_admin` | Haiku |
-| 3 | **Architect** | Approach for non-trivial work; respects existing patterns (repo Memory) | `read_repo`, `search_code`, `read_memory` | Sonnet |
-| 4 | **Coder / Implementer** | Branch, implement, write tests, open PR | `git`, `write_files`, `open_pr`, `code_interpreter` | Sonnet |
-| 5 | **Reviewer** | Independent code review on the PR; requests changes | `get_pr_diff`, `review_pr`, `comment` | Sonnet |
-| 6 | **Security** | Run Semgrep/Trivy/gitleaks/tfsec; triage; **block on Critical/High** | `run_scanners`, `annotate_pr` | Haiku→Sonnet |
-| 7 | **Testing / QA** | Extend unit/integration/e2e; run product eval harness (§14); coverage gate | `run_tests`, `run_eval`, `coverage` | Sonnet |
-| 8 | **Release Manager** | SemVer, changelog, deploy staging, prep prod for human approval, rollback | `tag`, `changelog`, `deploy`, `rollback` | Haiku |
-| 9 | **Sandbox / Preview** | Provision on-demand ephemeral env for UAT; tear down | `provision_preview`, `destroy_preview` | Haiku |
+| #   | Agent                   | Responsibility                                                                                   | Key tools (via AgentCore Gateway)                   | Model        |
+| --- | ----------------------- | ------------------------------------------------------------------------------------------------ | --------------------------------------------------- | ------------ |
+| 1   | **Orchestrator**        | SDLC state machine, gating, retries, kill switch                                                 | Step Functions (not an LLM)                         | —            |
+| 2   | **Triage / Planner**    | Read Issue, clarify acceptance criteria (may ask admin back in-app), label, decompose into tasks | `get_issue`, `comment_issue`, `label`, `ask_admin`  | Haiku        |
+| 3   | **Architect**           | Approach for non-trivial work; respects existing patterns (repo Memory)                          | `read_repo`, `search_code`, `read_memory`           | Sonnet       |
+| 4   | **Coder / Implementer** | Branch, implement, write tests, open PR                                                          | `git`, `write_files`, `open_pr`, `code_interpreter` | Sonnet       |
+| 5   | **Reviewer**            | Independent code review on the PR; requests changes                                              | `get_pr_diff`, `review_pr`, `comment`               | Sonnet       |
+| 6   | **Security**            | Run Semgrep/Trivy/gitleaks/tfsec; triage; **block on Critical/High**                             | `run_scanners`, `annotate_pr`                       | Haiku→Sonnet |
+| 7   | **Testing / QA**        | Extend unit/integration/e2e; run product eval harness (§14); coverage gate                       | `run_tests`, `run_eval`, `coverage`                 | Sonnet       |
+| 8   | **Release Manager**     | SemVer, changelog, deploy staging, prep prod for human approval, rollback                        | `tag`, `changelog`, `deploy`, `rollback`            | Haiku        |
+| 9   | **Sandbox / Preview**   | Provision on-demand ephemeral env for UAT; tear down                                             | `provision_preview`, `destroy_preview`              | Haiku        |
 
 ---
 
@@ -171,6 +173,7 @@ stak-platform/                      # monorepo
 ```
 
 Rationale notes:
+
 - The **SDLC agents live in the same repo they build** → they version with the code, and can self-improve their own prompts/skills under the same gates.
 - A **second, tiny repo** is justified only for the **GitHub App** (the app manifest/credentials broker) if you want its lifecycle isolated; otherwise keep it in `infra/`.
 
@@ -203,13 +206,13 @@ Rationale notes:
 
 A new **admin-only** area in the dashboard (RBAC: `CHAIRPERSON`/admin), separate from the trustee surfaces.
 
-| Component | Purpose |
-|-----------|---------|
+| Component        | Purpose                                                                                                                                                                  |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **Submit panel** | Bug or Feature form → maps to `.github/ISSUE_TEMPLATE` fields (title, description, steps/expected, priority, screenshots). Creates a GitHub Issue via the Intake Bridge. |
-| **Work board** | Live status of each Issue's SDLC run (Triage → … → Release), sourced from Step Functions + GitHub. |
-| **UAT panel** | Preview-env link, automated-check summary, **Approve** / **Request changes** (free-text feedback → Issue comment → new iteration). |
-| **Deploy gate** | Production-deploy **Approve** button (drives the GitHub Environment required-review). |
-| **Audit view** | Per-Issue trail: agent actions, gate results, diffs, deploy record. |
+| **Work board**   | Live status of each Issue's SDLC run (Triage → … → Release), sourced from Step Functions + GitHub.                                                                       |
+| **UAT panel**    | Preview-env link, automated-check summary, **Approve** / **Request changes** (free-text feedback → Issue comment → new iteration).                                       |
+| **Deploy gate**  | Production-deploy **Approve** button (drives the GitHub Environment required-review).                                                                                    |
+| **Audit view**   | Per-Issue trail: agent actions, gate results, diffs, deploy record.                                                                                                      |
 
 **Bridge security**: the in-app submit calls an authenticated API (Cognito JWT, admin scope) → Lambda → GitHub App (short-lived token via AgentCore Identity). No PATs in the browser or server. Status streams back via the existing API Gateway WebSocket.
 
@@ -219,17 +222,17 @@ A new **admin-only** area in the dashboard (RBAC: `CHAIRPERSON`/admin), separate
 
 `pre-commit` framework, mirrored as CI required checks (defense-in-depth; hooks are **never** bypassable in CI even if skipped locally):
 
-| Hook | Tool | Blocks on |
-|------|------|-----------|
-| Secret scan | **gitleaks** + `detect-secrets` | any detected secret (hard "never" rule) |
-| Python lint/format | **ruff** + **black** | lint errors, format drift |
-| Python types | **mypy** (or pyright) | type errors |
-| JS/TS lint/format | **eslint** + **prettier** | lint errors, format drift |
-| TS types | **tsc --noEmit** | type errors |
-| IaC | **terraform fmt** + **tfsec**/checkov | misconfig, format |
-| SAST (staged) | **semgrep --error** | matched rules |
-| Commit message | **commitlint** (Conventional Commits) | non-conforming messages (drives SemVer/changelog) |
-| Large files / merge markers | pre-commit built-ins | accidental commits |
+| Hook                        | Tool                                  | Blocks on                                         |
+| --------------------------- | ------------------------------------- | ------------------------------------------------- |
+| Secret scan                 | **gitleaks** + `detect-secrets`       | any detected secret (hard "never" rule)           |
+| Python lint/format          | **ruff** + **black**                  | lint errors, format drift                         |
+| Python types                | **mypy** (or pyright)                 | type errors                                       |
+| JS/TS lint/format           | **eslint** + **prettier**             | lint errors, format drift                         |
+| TS types                    | **tsc --noEmit**                      | type errors                                       |
+| IaC                         | **terraform fmt** + **tfsec**/checkov | misconfig, format                                 |
+| SAST (staged)               | **semgrep --error**                   | matched rules                                     |
+| Commit message              | **commitlint** (Conventional Commits) | non-conforming messages (drives SemVer/changelog) |
+| Large files / merge markers | pre-commit built-ins                  | accidental commits                                |
 
 > Per your guardrails: hooks **must not** be disabled and CI re-runs every check, so a local `--no-verify` cannot land non-compliant code.
 
@@ -273,17 +276,17 @@ Most cost-effective AI-native model under the lean budget:
 
 ## 12. Security & Guardrails
 
-| Control | Implementation |
-|---------|----------------|
-| No stored secrets | AgentCore **Identity** issues short-lived GitHub App + AWS tokens; OIDC for deploys |
-| Least privilege | Scoped GitHub App permissions; per-agent IAM roles; preview account isolated from prod |
-| Branch protection | `main`: PR-only, required checks, signed commits, linear history, no force-push |
-| Blocking security gate | Semgrep/Trivy/gitleaks/tfsec must pass; Critical/High fails merge |
-| Supply chain | Pinned deps, Trivy SCA, Dependabot (optional), provenance on build artifacts |
-| Prod gate | GitHub Environment required reviewer = admin |
-| Kill switch | `automation:paused` repo variable/label halts the orchestrator |
-| Budget guardrails | Iteration cap + per-issue token budget; alerts on overrun |
-| Audit | AgentCore Observability traces + GitHub history + deploy records = full SDLC trail |
+| Control                  | Implementation                                                                                        |
+| ------------------------ | ----------------------------------------------------------------------------------------------------- |
+| No stored secrets        | AgentCore **Identity** issues short-lived GitHub App + AWS tokens; OIDC for deploys                   |
+| Least privilege          | Scoped GitHub App permissions; per-agent IAM roles; preview account isolated from prod                |
+| Branch protection        | `main`: PR-only, required checks, signed commits, linear history, no force-push                       |
+| Blocking security gate   | Semgrep/Trivy/gitleaks/tfsec must pass; Critical/High fails merge                                     |
+| Supply chain             | Pinned deps, Trivy SCA, Dependabot (optional), provenance on build artifacts                          |
+| Prod gate                | GitHub Environment required reviewer = admin                                                          |
+| Kill switch              | `automation:paused` repo variable/label halts the orchestrator                                        |
+| Budget guardrails        | Iteration cap + per-issue token budget; alerts on overrun                                             |
+| Audit                    | AgentCore Observability traces + GitHub history + deploy records = full SDLC trail                    |
 | Prompt-injection defense | Treat Issue/PR/comment text as untrusted; tool allow-lists; no shell exec outside the harness microVM |
 
 ---
@@ -292,14 +295,14 @@ Most cost-effective AI-native model under the lean budget:
 
 Target **< $50/mo** at low throughput (a handful of issues/week):
 
-| Item | Approach | Est. |
-|------|----------|------|
-| Agent inference (Bedrock) | Haiku-first triage, Sonnet for code, capped iterations | ~$15–30 |
-| AgentCore managed harness (microVM) | No charge for the harness/CLI/skills; pay underlying compute, scales to zero | ~$5–10 |
-| GitHub Actions | GitHub-hosted free minutes (public/low usage) | $0 |
-| Preview envs | On-demand serverless, auto-destroy, synthetic data | ~$2–5 |
-| Storage/observability | S3/CloudWatch low volume | ~$2 |
-| **Total** | | **~$25–47/mo** |
+| Item                                | Approach                                                                     | Est.           |
+| ----------------------------------- | ---------------------------------------------------------------------------- | -------------- |
+| Agent inference (Bedrock)           | Haiku-first triage, Sonnet for code, capped iterations                       | ~$15–30        |
+| AgentCore managed harness (microVM) | No charge for the harness/CLI/skills; pay underlying compute, scales to zero | ~$5–10         |
+| GitHub Actions                      | GitHub-hosted free minutes (public/low usage)                                | $0             |
+| Preview envs                        | On-demand serverless, auto-destroy, synthetic data                           | ~$2–5          |
+| Storage/observability               | S3/CloudWatch low volume                                                     | ~$2            |
+| **Total**                           |                                                                              | **~$25–47/mo** |
 
 Throughput is the main cost driver; the iteration cap + on-demand preview keep it bounded.
 
@@ -317,13 +320,13 @@ Starting from **no GitHub repo and no AWS account**, the spend ramp is deliberat
 
 ## 14. Phased Delivery
 
-| Phase | Outcome |
-|-------|---------|
-| **P0 — Foundations** | Monorepo + pre-commit hooks + base CI gates (lint/type/unit/security) + branch protection + GitHub App via AgentCore Identity. *No agents yet — gates first.* |
-| **P1 — Intake loop** | Issue templates + in-app Dev Console submit + Intake Bridge + Triage agent (Issue → spec). |
-| **P2 — Build loop** | Coder + Reviewer + Testing agents; PR automation; auto-merge on green. |
-| **P3 — Release loop** | Security agent as blocking gate; Release Manager; staging deploy; on-demand preview; UAT panel; human-gated prod deploy + rollback. |
-| **P4 — Self-improvement** | Agents tune their own prompts/skills under the same gates; eval-gated skill mutation; metrics dashboard. |
+| Phase                     | Outcome                                                                                                                                                       |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **P0 — Foundations**      | Monorepo + pre-commit hooks + base CI gates (lint/type/unit/security) + branch protection + GitHub App via AgentCore Identity. _No agents yet — gates first._ |
+| **P1 — Intake loop**      | Issue templates + in-app Dev Console submit + Intake Bridge + Triage agent (Issue → spec).                                                                    |
+| **P2 — Build loop**       | Coder + Reviewer + Testing agents; PR automation; auto-merge on green.                                                                                        |
+| **P3 — Release loop**     | Security agent as blocking gate; Release Manager; staging deploy; on-demand preview; UAT panel; human-gated prod deploy + rollback.                           |
+| **P4 — Self-improvement** | Agents tune their own prompts/skills under the same gates; eval-gated skill mutation; metrics dashboard.                                                      |
 
 > Gates and guardrails (P0) ship **before** any autonomous agent — so autonomy is never ungated.
 
@@ -331,16 +334,16 @@ Starting from **no GitHub repo and no AWS account**, the spend ramp is deliberat
 
 ## 15. Open Questions & Risks
 
-| # | Item | Note |
-|---|------|------|
-| OQ1 | AgentCore availability/region | **Resolved.** The managed harness (preview) runs in **Europe (Frankfurt) `eu-central-1`** (one of four supported regions). The SDLC control-plane runs there and handles **code only, never POPIA data**; all product data + storage stays in **`af-south-1`**. |
-| OQ2 | GitHub plan / repo visibility | **Resolved.** GitHub **Free** + **public** repo. Per GitHub docs, rulesets/branch protection on Free are available on **public** repos only (private needs Pro/Team), and public repos get **unlimited Actions minutes** — so public is the only $0 path that still enforces the gated-autonomy model. Trade-off: source is visible; mitigated because the repo holds **zero secrets** (gitleaks/detect-secrets/semgrep gates) and all secrets + POPIA data live in AWS, never in Git. |
-| OQ3 | "Fully autonomous merge" sign-off | Confirm you accept agent-authored code merging to `main` without human review, relying solely on gates (mitigated by §3.1). |
-| OQ4 | Single human approver | Production-deploy gate assumes one admin; add a backup reviewer to avoid a bottleneck. |
-| R1 | Runaway agent loops burn budget | Iteration/token caps + alerts + kill switch. |
-| R2 | Gate gaming (agent weakens a test to pass) | Reviewer + eval baseline + coverage-cannot-decrease rule + protected eval/test dirs in CODEOWNERS. |
-| R3 | Prompt injection via Issue/PR text | Untrusted-input handling, tool allow-lists, sandboxed exec only. |
-| R4 | Preview env data leakage | Separate account, synthetic data, no prod IAM path. |
+| #   | Item                                       | Note                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| --- | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| OQ1 | AgentCore availability/region              | **Resolved.** The managed harness (preview) runs in **Europe (Frankfurt) `eu-central-1`** (one of four supported regions). The SDLC control-plane runs there and handles **code only, never POPIA data**; all product data + storage stays in **`af-south-1`**.                                                                                                                                                                                                                        |
+| OQ2 | GitHub plan / repo visibility              | **Resolved.** GitHub **Free** + **public** repo. Per GitHub docs, rulesets/branch protection on Free are available on **public** repos only (private needs Pro/Team), and public repos get **unlimited Actions minutes** — so public is the only $0 path that still enforces the gated-autonomy model. Trade-off: source is visible; mitigated because the repo holds **zero secrets** (gitleaks/detect-secrets/semgrep gates) and all secrets + POPIA data live in AWS, never in Git. |
+| OQ3 | "Fully autonomous merge" sign-off          | Confirm you accept agent-authored code merging to `main` without human review, relying solely on gates (mitigated by §3.1).                                                                                                                                                                                                                                                                                                                                                            |
+| OQ4 | Single human approver                      | Production-deploy gate assumes one admin; add a backup reviewer to avoid a bottleneck.                                                                                                                                                                                                                                                                                                                                                                                                 |
+| R1  | Runaway agent loops burn budget            | Iteration/token caps + alerts + kill switch.                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| R2  | Gate gaming (agent weakens a test to pass) | Reviewer + eval baseline + coverage-cannot-decrease rule + protected eval/test dirs in CODEOWNERS.                                                                                                                                                                                                                                                                                                                                                                                     |
+| R3  | Prompt injection via Issue/PR text         | Untrusted-input handling, tool allow-lists, sandboxed exec only.                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| R4  | Preview env data leakage                   | Separate account, synthetic data, no prod IAM path.                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 
 ---
 
@@ -357,4 +360,4 @@ I will **not** create repositories, push, or enable automation until you approve
 
 ---
 
-*End of Document*
+_End of Document_
