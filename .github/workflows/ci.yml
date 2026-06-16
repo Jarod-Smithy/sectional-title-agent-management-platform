@@ -13,6 +13,12 @@ on:
 permissions:
   contents: read
 
+# Force JS actions onto the Node 24 runtime. Our direct actions are already on
+# Node-24 majors; this also opts in transitive actions (e.g. actions/cache@v4
+# pinned inside pre-commit/action) so the Node 20 deprecation warnings clear.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -23,13 +29,13 @@ jobs:
     name: Lint / Format / Secrets
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: "20"
       - name: Run pre-commit (all hooks)
@@ -41,10 +47,10 @@ jobs:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: "20"
       - run: npm install --no-save @commitlint/cli @commitlint/config-conventional
@@ -56,8 +62,8 @@ jobs:
     name: Python (typecheck + unit)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       - name: Detect Python sources
@@ -84,8 +90,8 @@ jobs:
     name: Node (typecheck + unit)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
         with:
           node-version: "20"
       - name: Detect TS sources
@@ -112,12 +118,12 @@ jobs:
     name: Security (SAST / SCA / Secrets / IaC)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
       - name: gitleaks (full-history secret scan)
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "false"
@@ -151,7 +157,7 @@ jobs:
     name: Agent Eval Gate
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Detect eval harness
         id: detect
         run: |
