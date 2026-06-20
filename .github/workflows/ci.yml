@@ -63,6 +63,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # full history for diff-cover (G5)
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
@@ -77,13 +79,19 @@ jobs:
           fi
       - name: Install tooling
         if: steps.detect.outputs.present == 'true'
-        run: python -m pip install ruff mypy pytest pytest-cov
+        run: python -m pip install ruff mypy pytest pytest-cov diff-cover
       - name: Mypy (strict)
         if: steps.detect.outputs.present == 'true'
         run: mypy
       - name: Pytest + coverage
         if: steps.detect.outputs.present == 'true'
-        run: pytest --cov --cov-report=term-missing
+        run: pytest --cov --cov-report=term-missing --cov-report=xml
+      - name: Diff coverage (changed lines must stay covered — G5)
+        if: steps.detect.outputs.present == 'true' && github.event_name == 'pull_request'
+        run: |
+          diff-cover coverage.xml \
+            --compare-branch "origin/${{ github.event.pull_request.base.ref }}" \
+            --fail-under=100
 
   # ── Node typecheck + unit (guarded) ──────────────────────────────────
   node:
@@ -152,6 +160,55 @@ jobs:
           soft_fail: false
           framework: terraform,cloudformation,dockerfile
 
+  # ── Policy-as-code (BLOCKING): Conftest/OPA org guardrails on Terraform ──
+  policy:
+    name: Policy (Conftest / OPA)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Verify policy unit tests
+        uses: instrumenta/conftest-action@master
+        with:
+          files: policy
+          args: verify --policy policy
+      - name: Detect Terraform
+        id: detect
+        run: |
+          if find infra -name '*.tf' 2>/dev/null | grep -q .; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "No Terraform yet — policy unit tests ran; plan checks arrive with infra (P0.5/P3)."
+          fi
+      - name: Render Terraform plan to JSON
+        if: steps.detect.outputs.present == 'true'
+        run: |
+          cd infra
+          terraform init -backend=false
+          terraform plan -out=tfplan.bin
+          terraform show -json tfplan.bin > tfplan.json
+      - name: Conftest test plan against org policy
+        if: steps.detect.outputs.present == 'true'
+        uses: instrumenta/conftest-action@master
+        with:
+          files: infra/tfplan.json
+          args: test --policy policy
+
+  # ── Diff-size budget (BLOCKING on PRs): cap files/lines per change (G12) ──
+  diff-budget:
+    name: Diff-size budget
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Check diff budget
+        if: "!contains(github.event.pull_request.labels.*.name, 'oversized-change-approved')"
+        run: |
+          git fetch --no-tags --depth=1 origin "${{ github.event.pull_request.base.ref }}"
+          bash tooling/check-diff-budget.sh "origin/${{ github.event.pull_request.base.ref }}" HEAD
+
   # ── Eval gate (BLOCKING once eval harness exists) ────────────────────
   eval:
     name: Agent Eval Gate
@@ -177,7 +234,17 @@ jobs:
   gates:
     name: All gates
     if: always()
-    needs: [lint-format, commitlint, python, node, security, eval]
+    needs:
+      [
+        lint-format,
+        commitlint,
+        python,
+        node,
+        security,
+        policy,
+        diff-budget,
+        eval,
+      ]
     runs-on: ubuntu-latest
     steps:
       - name: Verify all required gates passed

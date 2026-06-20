@@ -1,0 +1,110 @@
+# Supply-chain integrity (Plan §2 G1): SBOM + signing + provenance.
+#
+# - SBOM: Syft generates an SPDX SBOM of the repo + dependencies on every push
+#   to main and every PR. Uploaded as a build artifact and (on main) attached
+#   to the workflow run. Always runs.
+# - Image signing + SLSA provenance: guarded — only runs once a container image
+#   exists (a Dockerfile is present). Uses cosign keyless (OIDC/Sigstore) so no
+#   private keys are stored. Provenance is generated as an in-toto attestation
+#   and signed alongside the image.
+#
+# Commit signing (gitsign) is enforced separately via branch protection
+# required_signatures — see tooling/enable-signed-commits.sh.
+
+name: Supply Chain
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supply-chain-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── SBOM (always) ────────────────────────────────────────────────────
+  sbom:
+    name: SBOM (Syft / SPDX)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Generate SBOM (SPDX JSON)
+        uses: anchore/sbom-action@v0
+        with:
+          path: .
+          format: spdx-json
+          artifact-name: sbom.spdx.json
+          output-file: sbom.spdx.json
+
+      - name: Scan SBOM for known vulnerabilities (Grype)
+        uses: anchore/scan-action@v6
+        with:
+          sbom: sbom.spdx.json
+          severity-cutoff: high
+          fail-build: true
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-spdx-json
+          path: sbom.spdx.json
+          if-no-files-found: error
+
+  # ── Image signing + SLSA provenance (guarded: only when an image exists) ─
+  image-attest:
+    name: Sign image + SLSA provenance
+    runs-on: ubuntu-latest
+    needs: sbom
+    permissions:
+      contents: read
+      id-token: write # keyless cosign (OIDC)
+      packages: write # push signed image/attestation
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Detect container build
+        id: detect
+        run: |
+          if find . -name 'Dockerfile' -not -path './node_modules/*' 2>/dev/null | grep -q .; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "No Dockerfile yet — image signing/provenance arrives with the first service image (P2)."
+          fi
+
+      - name: Install cosign
+        if: steps.detect.outputs.present == 'true'
+        uses: sigstore/cosign-installer@v3
+
+      - name: Build, sign, and attest (keyless)
+        if: steps.detect.outputs.present == 'true'
+        run: |
+          echo "Placeholder for P2: docker build -> push -> cosign sign --yes <ref> ->"
+          echo "cosign attest --yes --predicate sbom.spdx.json --type spdxjson <ref>."
+          echo "SLSA provenance is produced via the slsa-github-generator reusable workflow"
+          echo "once images are published; deploy verifies with 'cosign verify-attestation'."
+
+  gate:
+    name: Supply-chain gate
+    if: always()
+    needs: [sbom, image-attest]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify supply-chain jobs
+        run: |
+          results='${{ toJSON(needs) }}'
+          echo "$results"
+          echo "$results" | python3 -c "
+          import json,sys
+          needs=json.load(sys.stdin)
+          bad=[k for k,v in needs.items() if v['result'] not in ('success','skipped')]
+          if bad:
+              print('FAILED supply-chain jobs:', bad); sys.exit(1)
+          print('Supply-chain green.')
+          "

@@ -47,3 +47,16 @@ source = ["services", "sdlc-agents", "eval"]
 # Critical modules must stay highly covered (PII redaction, scoring, versioning).
 fail_under = 90
 show_missing = true
+
+[tool.coverage.xml]
+# Emitted for diff-cover (coverage-cannot-decrease gate, Plan §2 G5).
+output = "coverage.xml"
+
+[tool.mutmut]
+# Mutation testing on critical modules only (Plan §2 G5). Keeps runtime sane
+# while catching tests that pass without actually asserting behaviour. Extend
+# paths_to_mutate as critical modules land (PII redaction, scoring,
+# resolution-gate, versioning).
+paths_to_mutate = "services/,sdlc-agents/"
+tests_dir = "tests/"
+runner = "python -m pytest -x -q"
