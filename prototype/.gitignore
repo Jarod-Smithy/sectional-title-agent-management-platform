@@ -1,0 +1,5 @@
+# Prototype-local artifacts (throwaway sandbox)
+.venv/
+data/
+__pycache__/
+*.pyc

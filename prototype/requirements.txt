@@ -1,0 +1,4 @@
+# No third-party dependencies — the prototype runs on the Python 3.11+ standard
+# library only (http.server + sqlite3), so it works fully offline with no pip
+# install and no proxy/VPN. The optional Anthropic upgrade also uses only
+# urllib from the stdlib.

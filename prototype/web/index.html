@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Acacia Heights — Trustee Platform (Prototype)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header>
+      <div class="brand">
+        <h1>Trustee Platform</h1>
+        <span class="scheme">Acacia Heights Body Corporate · prototype</span>
+      </div>
+      <div class="meta">
+        <span id="mode-banner" class="badge mode">Demo — replies are filed, not emailed</span>
+      </div>
+    </header>
+
+    <nav class="tabs">
+      <button data-tab="inbox" class="active">Inbox</button>
+      <button data-tab="board">Task Board</button>
+      <button data-tab="resolutions">Resolutions</button>
+      <button data-tab="ask">Ask the Records</button>
+      <button data-tab="documents">Documents</button>
+    </nav>
+
+    <main>
+      <!-- INBOX -->
+      <section id="tab-inbox" class="tab active">
+        <div class="two-col">
+          <div class="panel">
+            <h2>Simulate an inbound email</h2>
+            <form id="email-form">
+              <label>From <input name="sender" value="owner.surname@gmail.com" required /></label>
+              <label>Sender's unit <input name="from_unit" placeholder="Unit 5" /></label>
+              <label>Subject <input name="subject" placeholder="Subject" required /></label>
+              <label>Body <textarea name="body" rows="5" placeholder="Message…" required></textarea></label>
+              <button type="submit">Process &rarr; draft reply</button>
+            </form>
+            <p class="hint">
+              The Intake Classifier triages it, the document brain retrieves
+              context, the Draft Composer writes a reply, and the Governance
+              Guardian screens it before you file. The matter's unit is read from
+              the subject/body; if none is found, the sender's unit is used.
+            </p>
+          </div>
+          <div class="panel">
+            <h2>Drafts awaiting approval</h2>
+            <div id="drafts"></div>
+            <h2 class="filed-heading">Filed correspondence</h2>
+            <p class="hint">Filed to the scheme record. Nothing was emailed.</p>
+            <div id="filed"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- BOARD -->
+      <section id="tab-board" class="tab">
+        <div class="two-col">
+          <div class="panel">
+            <h2>Add a task</h2>
+            <p class="hint">Raise a standalone reminder for the Chairperson. Tasks are
+              just reminders — the Governance Guardian screens any action later, when it
+              is actually taken.</p>
+            <form id="task-form">
+              <input type="hidden" name="source" value="manual" />
+              <input type="hidden" name="source_resolution_id" value="" />
+              <p id="task-source-note" class="task-source-note" hidden></p>
+              <label>Title <input name="title" placeholder="e.g. Obtain 3 quotes for gate motor" required /></label>
+              <label>Type
+                <select name="type">
+                  <option value="general">general</option>
+                  <option value="maintenance">maintenance</option>
+                  <option value="financial">financial</option>
+                  <option value="complaint">complaint</option>
+                  <option value="governance">governance</option>
+                  <option value="compliance">compliance</option>
+                </select>
+              </label>
+              <label>Priority
+                <select name="priority">
+                  <option value="normal">normal</option>
+                  <option value="high">high</option>
+                </select>
+              </label>
+              <label>Unit <span class="hint">optional — leave blank for scheme-wide</span>
+                <input name="unit" placeholder="Unit 12" />
+              </label>
+              <label>Due date <span class="hint">optional</span>
+                <input name="due_date" type="date" />
+              </label>
+              <label>Details <span class="hint">optional</span>
+                <textarea name="description" rows="3" placeholder="Any context for the task…"></textarea>
+              </label>
+              <div class="task-actions">
+                <button type="submit">Add task</button>
+                <button type="button" id="task-reset" class="ghost">Clear</button>
+              </div>
+            </form>
+          </div>
+          <div class="panel">
+            <h2>Trustee Task Board</h2>
+            <p class="hint">Tasks come from three places: filed replies, the chairman's
+              <code>TASK:</code> emails, and signed resolutions. Drag-free — use the move
+              buttons to advance a card.</p>
+            <div class="board">
+              <div class="col" data-status="todo"><h3>To do</h3><div class="cards"></div></div>
+              <div class="col" data-status="in_progress"><h3>In progress</h3><div class="cards"></div></div>
+              <div class="col" data-status="done"><h3>Done</h3><div class="cards"></div></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- RESOLUTIONS -->
+      <section id="tab-resolutions" class="tab">
+        <h2>Resolution register</h2>
+        <p class="hint">Signed resolutions are the scheme's source of truth for what the
+          trustees may act on. Spin any resolution into a board task for the Chairperson.</p>
+        <div id="resolutions"></div>
+      </section>
+
+      <!-- ASK -->
+      <section id="tab-ask" class="tab">
+        <h2>Ask the scheme's records</h2>
+        <form id="ask-form">
+          <input name="question" placeholder="e.g. What are the quiet hours? Can we charge interest on arrears?" required />
+          <button type="submit">Ask</button>
+        </form>
+        <p class="hint">Answers are guidance drawn from your documents, not formal legal advice.</p>
+        <div id="ask-answer"></div>
+      </section>
+
+      <!-- DOCUMENTS -->
+      <section id="tab-documents" class="tab">
+        <div class="two-col">
+          <div class="panel">
+            <h2>Add a document</h2>
+            <p class="hint">Drop in a plain-text file and the assistant suggests a title and category for you to confirm.</p>
+
+            <!-- Drag & drop / click / keyboard upload -->
+            <div id="dropzone" class="dropzone" role="button" tabindex="0"
+                 aria-label="Upload a document. Drag and drop a .txt or .md file here, or press Enter to browse. Supported formats: .txt and .md, up to 2 MB.">
+              <div class="dropzone-icon" aria-hidden="true">📄</div>
+              <div class="dropzone-text">
+                <strong>Drop a .txt or .md file here</strong>
+                <span class="dropzone-hint">or click to choose a file</span>
+              </div>
+              <input id="file-input" type="file" accept=".txt,.md,.markdown,.text,text/plain" hidden />
+            </div>
+
+            <!-- Reading / analysing state -->
+            <div id="upload-status" class="reading-state" hidden>
+              <span class="loader" aria-hidden="true"></span>
+              <span id="upload-status-text" aria-live="polite">Reading…</span>
+            </div>
+
+            <!-- Review & confirm card (shown after analysis) -->
+            <form id="review-form" class="review-card" hidden>
+              <h3>Review &amp; confirm</h3>
+              <label>Suggested title
+                <input id="review-title" name="title" required autocomplete="off" />
+              </label>
+              <label>Category <span class="hint">suggested — change if needed</span>
+                <select id="review-category" name="category" required>
+                  <option>rules</option><option>finance</option>
+                  <option>maintenance</option><option>governance</option>
+                  <option>compliance</option><option>general</option>
+                </select>
+              </label>
+              <label>Effective date
+                <input id="review-date" name="effective_date" type="date" />
+              </label>
+              <label>What we read
+                <div id="review-preview" class="review-preview" aria-label="Preview of the document content"></div>
+              </label>
+              <p id="review-meta" class="hint"></p>
+              <div class="review-actions">
+                <button type="submit" class="approve">Save to document brain</button>
+                <button type="button" id="review-cancel" class="ghost">Cancel</button>
+              </div>
+            </form>
+
+            <!-- Always-available manual fallback -->
+            <details id="manual-fallback" class="fallback-manual">
+              <summary>Or paste text manually</summary>
+              <form id="doc-form">
+                <label>Title <input name="title" required /></label>
+                <label>Category
+                  <select name="category">
+                    <option>rules</option><option>finance</option>
+                    <option>maintenance</option><option>governance</option>
+                    <option>compliance</option><option>general</option>
+                  </select>
+                </label>
+                <label>Effective date <input name="effective_date" type="date" /></label>
+                <label>Content <textarea name="content" rows="6" required></textarea></label>
+                <button type="submit">Add to document brain</button>
+              </form>
+            </details>
+          </div>
+          <div class="panel">
+            <h2>Document brain</h2>
+            <div id="documents"></div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="app-footer">
+      <span id="llm-badge" class="badge subtle">engine: …</span>
+      <label class="assist-toggle" title="Global on/off for the specialist agent assist">
+        <input type="checkbox" id="assist-enabled" /> agent assist
+      </label>
+      <label class="assist-toggle kill" title="Emergency stop — blocks every agent run">
+        <input type="checkbox" id="assist-kill" /> kill-switch
+      </label>
+      <button id="reseed" class="ghost small" title="Reset to sample data">Reset to sample data…</button>
+    </footer>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
