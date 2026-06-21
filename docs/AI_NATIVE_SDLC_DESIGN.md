@@ -6,6 +6,13 @@
 **Status**: Layer 1 spec — pending stakeholder validation **before** any repo/hook scaffolding
 **Purpose**: Define a self-developing software factory where specialized AI agents own the full software development lifecycle (SDLC) of the property platform — spec → code → review → security → test → release — with an in-app, admin-only intake and human approval only at the production-deploy boundary.
 
+> **Authority note (2026-06-21):** Where this draft disagrees with the implemented
+> operating model — region (this doc says eu-central-1), roster size (9 agents), or
+> self-built Step Functions orchestration — **[AI_NATIVE_SDLC_OPERATING_MODEL.md](AI_NATIVE_SDLC_OPERATING_MODEL.md)
+> and ADRs [0007](adr/0007-agentcore-harness-for-sdlc.md) and [0013](adr/0013-confirm-harness-region.md)/[0014](adr/0014-minimal-sdlc-agent-roster.md)
+> are authoritative.** This document is retained as the originating spec and needs a
+> revision pass.
+
 > This document follows the same **3-Layer Karpathy method** used for the product design: **Layer 1 (Spec)** = this blueprint; **Layer 2 (Verifier)** = the quality gates and eval harness; **Layer 3 (Environment)** = the repo, hooks, and runtime guardrails. No code or repos are created until this spec is validated.
 
 ---

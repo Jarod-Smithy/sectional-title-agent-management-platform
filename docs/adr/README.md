@@ -19,16 +19,25 @@ settled questions.
 
 ## Index
 
-| ADR                                             | Title                                                        | Status   |
-| ----------------------------------------------- | ------------------------------------------------------------ | -------- |
-| [0000](0000-record-architecture-decisions.md)   | Record architecture decisions                                | Accepted |
-| [0001](0001-aws-serverless-cost-cap.md)         | AWS serverless (Lambda + DynamoDB) under a $50 cap           | Accepted |
-| [0002](0002-two-region-data-inference-split.md) | Two-region split: data in af-south-1, inference in eu-west-1 | Accepted |
-| [0003](0003-pluggable-repository-port.md)       | Pluggable repository port: SQLite local, DynamoDB in prod    | Accepted |
-| [0004](0004-cognito-auth-off-by-default.md)     | Cognito JWT auth, off by default                             | Accepted |
-| [0005](0005-no-vpc-for-lambda.md)               | Lambda runs outside a VPC                                    | Accepted |
-| [0006](0006-bedrock-direct-adapter.md)          | Direct Bedrock Converse adapter for app-facing inference     | Accepted |
-| [0007](0007-agentcore-harness-for-sdlc.md)      | AgentCore managed harness for the SDLC/ops agents            | Accepted |
+| ADR                                                          | Title                                                        | Status   |
+| ------------------------------------------------------------ | ------------------------------------------------------------ | -------- |
+| [0000](0000-record-architecture-decisions.md)                | Record architecture decisions                                | Accepted |
+| [0001](0001-aws-serverless-cost-cap.md)                      | AWS serverless (Lambda + DynamoDB) under a $50 cap           | Accepted |
+| [0002](0002-two-region-data-inference-split.md)              | Two-region split: data in af-south-1, inference in eu-west-1 | Accepted |
+| [0003](0003-pluggable-repository-port.md)                    | Pluggable repository port: SQLite local, DynamoDB in prod    | Accepted |
+| [0004](0004-cognito-auth-off-by-default.md)                  | Cognito JWT auth, off by default                             | Accepted |
+| [0005](0005-no-vpc-for-lambda.md)                            | Lambda runs outside a VPC                                    | Accepted |
+| [0006](0006-bedrock-direct-adapter.md)                       | Direct Bedrock Converse adapter for app-facing inference     | Accepted |
+| [0007](0007-agentcore-harness-for-sdlc.md)                   | AgentCore managed harness for the SDLC/ops agents            | Accepted |
+| [0008](0008-agent-eval-gate-contract.md)                     | Agent Eval Gate contract (golden-set thresholds)             | Accepted |
+| [0009](0009-changed-line-coverage-and-no-decrease.md)        | Changed-line coverage 100% and coverage-cannot-decrease      | Accepted |
+| [0010](0010-mutation-testing-on-safety-modules.md)           | Mutation testing on safety-critical modules                  | Proposed |
+| [0011](0011-frontend-test-stack.md)                          | Frontend test stack (Vitest/MSW/Playwright/axe)              | Accepted |
+| [0012](0012-agent-bot-identity-and-codeowner-enforcement.md) | Agent bot identity and code-owner enforcement                | Proposed |
+| [0013](0013-confirm-harness-region.md)                       | Confirm AgentCore harness GA region                          | Proposed |
+| [0014](0014-minimal-sdlc-agent-roster.md)                    | Minimal SDLC agent roster (3, not 9)                         | Proposed |
+| [0015](0015-autonomy-ceiling.md)                             | Autonomy ceiling (graduated autonomy)                        | Proposed |
+| [0016](0016-harness-budget-governance.md)                    | Harness budget governance (sub-cap of $50)                   | Proposed |
 
 ## Creating a new ADR
 
