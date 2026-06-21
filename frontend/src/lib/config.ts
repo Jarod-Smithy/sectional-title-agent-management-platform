@@ -1,19 +1,29 @@
 // Public runtime config. NEXT_PUBLIC_* values are inlined into the client bundle
 // at build time; these are non-secret identifiers (Cognito pool/client IDs + API URL).
+//
+// IMPORTANT: each NEXT_PUBLIC_* var must be read via a *static* member access
+// (process.env.NEXT_PUBLIC_FOO), not a dynamic key (process.env[key]). Webpack
+// only inlines the statically-referenced names into the client bundle; a dynamic
+// lookup resolves to undefined in the browser and silently falls back below.
 
-function env(key: string, fallback: string): string {
-  const value = process.env[key];
+function orFallback(value: string | undefined, fallback: string): string {
   return value && value.length > 0 ? value : fallback;
 }
 
 export const config = {
-  apiBase: env("NEXT_PUBLIC_API_BASE", "http://localhost:8000").replace(
-    /\/$/,
-    "",
-  ),
+  apiBase: orFallback(
+    process.env.NEXT_PUBLIC_API_BASE,
+    "http://localhost:8000",
+  ).replace(/\/$/, ""),
   cognito: {
-    region: env("NEXT_PUBLIC_COGNITO_REGION", "af-south-1"),
-    userPoolId: env("NEXT_PUBLIC_COGNITO_USER_POOL_ID", "af-south-1_xxxxxxxxx"),
-    clientId: env("NEXT_PUBLIC_COGNITO_CLIENT_ID", "local-client-id"),
+    region: orFallback(process.env.NEXT_PUBLIC_COGNITO_REGION, "af-south-1"),
+    userPoolId: orFallback(
+      process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID,
+      "af-south-1_xxxxxxxxx",
+    ),
+    clientId: orFallback(
+      process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID,
+      "local-client-id",
+    ),
   },
 } as const;
