@@ -21,6 +21,10 @@ RepoBackend = Literal["sqlite", "dynamodb"]
 
 _SERVICE_DIR = Path(__file__).resolve().parent.parent
 
+# Cross-region inference-profile geo prefix by region family. Claude on Bedrock
+# is reached via a geo profile (e.g. ``eu.anthropic.claude-…``) outside us-east-1.
+_BEDROCK_GEO: dict[str, str] = {"eu": "eu", "us": "us", "ap": "apac"}
+
 
 class ModelTier(BaseSettings):
     """A reasoning tier the orchestrator can select by task complexity."""
@@ -62,6 +66,8 @@ class Settings(BaseSettings):
     # Cross-region inference target when Bedrock Claude is absent in af-south-1
     # (SOLUTION_DESIGN §4.2). Empty = call in `aws_region`.
     bedrock_inference_region: str = "eu-west-1"
+    # Default reasoning tier used by the Bedrock adapter (fast|balanced|deep).
+    bedrock_model_tier: str = "balanced"
 
     # ── Agent-assist runtime flags (kill-switch + global toggle) ─────────────
     assist_enabled: bool = True
@@ -128,6 +134,19 @@ class Settings(BaseSettings):
                 cost_per_run=0.33,
             ),
         }
+
+    @property
+    def bedrock_resolved_region(self) -> str:
+        """Region the Bedrock client targets (falls back to ``aws_region``)."""
+        return self.bedrock_inference_region or self.aws_region
+
+    def bedrock_model_id(self, tier: str | None = None) -> str:
+        """Bedrock model id for ``tier`` with the cross-region inference-profile
+        geo prefix applied (e.g. ``eu.anthropic.claude-3-5-sonnet-…``)."""
+        chosen = tier or self.bedrock_model_tier
+        base = self.model_tiers[chosen].bedrock_id
+        geo = _BEDROCK_GEO.get(self.bedrock_resolved_region.split("-", 1)[0], "")
+        return f"{geo}.{base}" if geo else base
 
     def resolve_provider(self) -> Provider:
         """Auto-detect Anthropic when a key is present but provider left default."""

@@ -31,10 +31,19 @@ def build_repo(settings: Settings) -> Repository:
 
 def build_llm(settings: Settings) -> LLM:
     provider = settings.resolve_provider()
-    if provider == "stub":
-        return StubLLM(accountable_human=settings.accountable_human)
-    # Anthropic / Bedrock adapters land in Increment 7; fall back to the stub so
-    # the service still runs if a provider is selected before its adapter exists.
+    if provider == "bedrock":
+        import boto3
+
+        from app.adapters.bedrock_llm import BedrockLLM
+
+        client = boto3.client("bedrock-runtime", region_name=settings.bedrock_resolved_region)
+        return BedrockLLM(
+            client=client,
+            model_id=settings.bedrock_model_id(),
+            accountable_human=settings.accountable_human,
+        )
+    # Anthropic adapter lands later; fall back to the stub so the service still
+    # runs if a provider is selected before its adapter exists.
     return StubLLM(accountable_human=settings.accountable_human)
 
 
