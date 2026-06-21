@@ -76,8 +76,24 @@ def test_priority_high() -> None:
 
 
 def test_case_ref_shape() -> None:
+    # Default path: wall clock + random suffix (exercises the production seams).
     ref = intake.case_ref("maintenance", "Unit 7")
     assert ref.startswith("MAI-7-")
+
+
+def test_case_ref_is_deterministic_when_seams_injected() -> None:
+    from datetime import UTC, datetime
+
+    fixed = datetime(2026, 6, 21, 9, 30, 0, tzinfo=UTC)
+    ref1 = intake.case_ref("complaint", "Unit 12", now=fixed, token_factory=lambda: "abcd")
+    ref2 = intake.case_ref("complaint", "Unit 12", now=fixed, token_factory=lambda: "abcd")
+    assert ref1 == ref2  # same seams -> fully reproducible
+    assert ref1.startswith("COM-12-")
+    assert ref1.endswith("-ABCD")
+    # Fallbacks: short intent -> GEN, no unit digits -> SCH (scheme-wide).
+    scheme = intake.case_ref("", "common area", now=fixed, token_factory=lambda: "ef01")
+    assert scheme.startswith("GEN-SCH-")
+    assert scheme.endswith("-EF01")
 
 
 def test_is_task_email() -> None:

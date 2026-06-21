@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import re
 import secrets
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from datetime import UTC, datetime
 
 _INTENT_KEYWORDS: list[tuple[str, list[str]]] = [
@@ -141,11 +141,20 @@ def priority(subject: str, body: str) -> str:
     return "high" if any(w in text for w in _PRIORITY_HIGH) else "normal"
 
 
-def case_ref(intent: str, unit: str) -> str:
+def case_ref(
+    intent: str,
+    unit: str,
+    *,
+    now: datetime | None = None,
+    token_factory: Callable[[], str] = lambda: secrets.token_hex(2),
+) -> str:
+    # ``now`` and ``token_factory`` are injectable seams: production uses the
+    # wall clock + a random suffix, while tests pin both for a reproducible ref.
     prefix = intent[:3].upper() or "GEN"
     unit_part = re.sub(r"\D", "", unit) or "SCH"  # SCH = scheme-wide
-    stamp = datetime.now(UTC).isoformat(timespec="seconds").replace("-", "").replace(":", "")[2:12]
-    suffix = secrets.token_hex(2).upper()
+    moment = now or datetime.now(UTC)
+    stamp = moment.isoformat(timespec="seconds").replace("-", "").replace(":", "")[2:12]
+    suffix = token_factory().upper()
     return f"{prefix}-{unit_part}-{stamp}-{suffix}"
 
 
