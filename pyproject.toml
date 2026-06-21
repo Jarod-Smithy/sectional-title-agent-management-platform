@@ -37,6 +37,12 @@ no_implicit_optional = true
 # here once they ship code (mypy errors hard on listed dirs with no .py files).
 files = ["services"]
 
+# boto3 / botocore / moto ship no type information; the DynamoDB adapter wraps
+# them at a single seam, so treat them as untyped rather than vendoring stubs.
+[[tool.mypy.overrides]]
+module = ["boto3.*", "botocore.*", "moto.*"]
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 addopts = "-q --strict-markers"
 testpaths = ["tests", "services", "sdlc-agents", "eval"]

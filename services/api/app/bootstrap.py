@@ -19,7 +19,12 @@ def build_repo(settings: Settings) -> Repository:
         repo = SqliteRepository(settings.db_path)
         repo.init()
         return repo
-    # DynamoDB adapter lands in Increment 6.
+    if settings.repo_backend == "dynamodb":
+        from app.adapters.dynamo_repo import DynamoRepository
+
+        dynamo = DynamoRepository(settings.dynamo_table, region=settings.aws_region)
+        dynamo.init()
+        return dynamo
     raise NotImplementedError(f"repo_backend '{settings.repo_backend}' not yet implemented")
 
 
