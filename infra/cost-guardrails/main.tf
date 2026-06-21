@@ -70,6 +70,12 @@ resource "aws_budgets_budget" "monthly_cap" {
 }
 
 # 3) Cost Anomaly Detection: ML-based, free. Flags unusual per-service spend.
+# NOTE: AWS auto-provisions one default SERVICE-dimension monitor per account
+# ("Default-Services-Monitor"), and the account limit for DIMENSIONAL/SERVICE
+# monitors is 1. On a fresh account, import that monitor before the first apply:
+#   aws ce get-anomaly-monitors --query 'AnomalyMonitors[?MonitorDimension==`SERVICE`].MonitorArn'
+#   terraform import aws_ce_anomaly_monitor.services <monitor-arn>
+# Applying then renames it to "stak-service-monitor" in place (name is updatable).
 resource "aws_ce_anomaly_monitor" "services" {
   name              = "stak-service-monitor"
   monitor_type      = "DIMENSIONAL"

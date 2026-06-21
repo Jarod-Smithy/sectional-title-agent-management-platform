@@ -1,0 +1,105 @@
+# Deploy the Dashboard API to AWS Lambda via GitHub OIDC (no stored cloud keys).
+#
+# Prerequisites (one-time, see infra/live/dev/af-south-1/):
+#   1. `cd infra/live/dev/af-south-1/bootstrap && terragrunt apply` (OIDC role)
+#      then `cd ../app && terragrunt apply` — both locally with admin/SSO creds.
+#   2. Set these GitHub Actions repository VARIABLES from the stack outputs:
+#        AWS_DEPLOY_ROLE_ARN  (bootstrap: deploy_role_arn)
+#        AWS_REGION           (af-south-1)
+#        API_ENDPOINT         (app: api_endpoint)
+#        LAMBDA_FUNCTION_NAME (app: lambda_function_name, e.g. stak-dev-api)
+#        LAMBDA_LAYER_NAME    (app: lambda_layer_name,   e.g. stak-dev-api-deps)
+#
+# This workflow only UPDATES the function code + dependency layer. It never
+# creates/destroys infrastructure (that stays in Terraform/Terragrunt, run locally).
+
+name: Deploy (Lambda)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "services/api/**"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch:
+
+permissions:
+  id-token: write # required for OIDC
+  contents: read
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  # Defaults match the dev app stack (name_prefix = stak-dev). Override per
+  # environment by setting the repository variables.
+  FUNCTION_NAME: ${{ vars.LAMBDA_FUNCTION_NAME || 'stak-dev-api' }}
+  LAYER_NAME: ${{ vars.LAMBDA_LAYER_NAME || 'stak-dev-api-deps' }}
+
+jobs:
+  deploy:
+    name: Build + deploy Lambda
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/api
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Build dependency layer (linux x86_64 wheels)
+        run: |
+          rm -rf build && mkdir -p build/layer/python
+          pip install --target build/layer/python -r requirements-lambda.txt
+          find build/layer/python -type d -name "__pycache__" -prune -exec rm -rf {} +
+          (cd build/layer && zip -qr ../layer.zip python)
+
+      - name: Build function package
+        run: zip -qr build/function.zip app
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Publish dependency layer
+        id: layer
+        run: |
+          arn=$(aws lambda publish-layer-version \
+            --layer-name "$LAYER_NAME" \
+            --zip-file fileb://build/layer.zip \
+            --compatible-runtimes python3.12 \
+            --compatible-architectures x86_64 \
+            --query LayerVersionArn --output text)
+          echo "arn=$arn" >> "$GITHUB_OUTPUT"
+
+      - name: Update function code
+        run: |
+          aws lambda update-function-code \
+            --function-name "$FUNCTION_NAME" \
+            --zip-file fileb://build/function.zip \
+            --publish >/dev/null
+          aws lambda wait function-updated --function-name "$FUNCTION_NAME"
+
+      - name: Attach dependency layer
+        run: |
+          aws lambda update-function-configuration \
+            --function-name "$FUNCTION_NAME" \
+            --layers "${{ steps.layer.outputs.arn }}" >/dev/null
+          aws lambda wait function-updated --function-name "$FUNCTION_NAME"
+
+      - name: Smoke test (/api/health)
+        run: |
+          url="${{ vars.API_ENDPOINT }}"
+          if [ -z "$url" ]; then
+            echo "API_ENDPOINT not set — skipping smoke test."
+            exit 0
+          fi
+          code=$(curl -s -o /dev/null -w "%{http_code}" "${url%/}/api/health")
+          echo "GET ${url%/}/api/health → $code"
+          test "$code" = "200"

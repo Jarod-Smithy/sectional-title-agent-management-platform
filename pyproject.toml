@@ -19,8 +19,8 @@ select = ["E", "F", "I", "B", "C4", "UP", "S"]
 ignore = ["E501"]  # line length handled by the formatter
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101"]   # asserts allowed in tests
-"eval/**" = ["S101"]
+"**/tests/**" = ["S101"]   # asserts allowed in tests
+"**/eval/**" = ["S101"]
 
 [tool.black]
 line-length = 100
@@ -33,7 +33,9 @@ warn_unused_ignores = true
 warn_redundant_casts = true
 disallow_untyped_defs = true
 no_implicit_optional = true
-files = ["services", "sdlc-agents", "eval"]
+# Only directories that currently contain Python. Re-add "sdlc-agents" / "eval"
+# here once they ship code (mypy errors hard on listed dirs with no .py files).
+files = ["services"]
 
 [tool.pytest.ini_options]
 addopts = "-q --strict-markers"

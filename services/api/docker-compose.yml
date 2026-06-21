@@ -1,0 +1,16 @@
+services:
+  api:
+    build: .
+    image: stak-api:local
+    ports:
+      - "8000:8000"
+    environment:
+      STAK_REPO_BACKEND: sqlite
+      STAK_DATA_DIR: /app/data
+      STAK_SERVE_STATIC: "false"
+      STAK_LLM_PROVIDER: stub
+    volumes:
+      - api-data:/app/data
+
+volumes:
+  api-data:
