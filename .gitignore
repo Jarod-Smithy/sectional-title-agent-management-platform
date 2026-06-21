@@ -36,6 +36,7 @@ yarn-error.log*
 
 # ─── Terraform ─────────────────────────────────────────────────────────
 .terraform/
+.terragrunt-cache/
 *.tfstate
 *.tfstate.*
 crash.log

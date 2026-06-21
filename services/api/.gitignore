@@ -1,0 +1,16 @@
+# Local build / runtime artefacts
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Local SQLite database (dev only — never committed)
+data/
+*.db

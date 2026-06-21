@@ -17,7 +17,7 @@
   "allow_deletions": false,
   "block_creations": false,
   "required_conversation_resolution": true,
-  "_required_signatures_note": "Signed commits are toggled via a SEPARATE endpoint (PUT branches/main/protection/required_signatures), not a valid key in this protection payload. Enable it there once SSH/GPG commit signing is configured.",
+  "_required_signatures_note": "Signed commits are toggled via a SEPARATE endpoint (POST branches/main/protection/required_signatures), not a key in this payload. Run tooling/enable-signed-commits.sh <owner> <repo> after configuring gitsign (keyless Sigstore signing).",
   "lock_branch": false,
   "allow_fork_syncing": false
 }

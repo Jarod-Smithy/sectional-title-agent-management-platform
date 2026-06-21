@@ -1,0 +1,50 @@
+# Dependency automation (Plan §2 G3 / P0 #8). Updates are PROPOSED as PRs and
+# must pass every required CI gate before they can merge — never auto-applied
+# blindly. Grouped to reduce PR noise; security updates are surfaced promptly.
+version: 2
+updates:
+  # ── GitHub Actions ───────────────────────────────────────────────────
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: "ci"
+
+  # ── Node / npm (root workspace) ──────────────────────────────────────
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      dev-dependencies:
+        dependency-type: development
+      production-dependencies:
+        dependency-type: production
+    commit-message:
+      prefix: "chore"
+      prefix-development: "chore"
+
+  # ── Python (pip / pyproject) ─────────────────────────────────────────
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      python:
+        patterns: ["*"]
+    commit-message:
+      prefix: "chore"
+
+  # ── Terraform ────────────────────────────────────────────────────────
+  - package-ecosystem: terraform
+    directory: "/infra"
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "chore"
