@@ -16,8 +16,8 @@ from fastapi.staticfiles import StaticFiles
 from mangum import Mangum
 
 from app import __version__
-from app.api.routes import router
-from app.bootstrap import build_llm, build_repo
+from app.api.routes import public_router, router
+from app.bootstrap import build_llm, build_repo, build_verifier
 from app.domain import seed as seed_module
 from app.settings import get_settings
 
@@ -29,6 +29,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     llm = build_llm(settings)
     app.state.repo = repo
     app.state.llm = llm
+    app.state.verifier = build_verifier(settings)
     app.state.runtime = {
         "assist_enabled": settings.assist_enabled,
         "kill_switch": settings.assist_kill_switch,
@@ -52,6 +53,7 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    app.include_router(public_router)
     app.include_router(router)
 
     # Serve the static dashboard locally (in production CloudFront + S3 host it).

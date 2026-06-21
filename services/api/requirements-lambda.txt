@@ -5,3 +5,5 @@ fastapi>=0.111
 pydantic>=2.7
 pydantic-settings>=2.3
 mangum>=0.17
+# Cognito access-token verification (RS256 + cryptography backend).
+pyjwt[crypto]>=2.8

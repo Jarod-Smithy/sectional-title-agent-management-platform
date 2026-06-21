@@ -28,6 +28,15 @@ variable "cors_allow_origins" {
   default = ["*"]
 }
 
+# Auth toggle: the Cognito pool is provisioned regardless, but enforcement on
+# the API stays OFF until a trustee user exists and the dashboard sends tokens.
+# Flip to true (and redeploy) to require Cognito access tokens on every route
+# except /api/health.
+variable "auth_enabled" {
+  type    = bool
+  default = false
+}
+
 module "tags" {
   source = "../../modules/tags"
 
@@ -43,6 +52,13 @@ module "dynamodb" {
   tags       = module.tags.tags
 }
 
+module "cognito" {
+  source = "../../modules/cognito"
+
+  name_prefix = var.name_prefix
+  tags        = module.tags.tags
+}
+
 module "lambda_api" {
   source = "../../modules/lambda_api"
 
@@ -54,6 +70,15 @@ module "lambda_api" {
   timeout_s           = var.lambda_timeout_s
   log_retention_days  = var.log_retention_days
   tags                = module.tags.tags
+
+  # Cognito auth wiring. The verifier only fetches the pool's public JWKS over
+  # HTTPS (no IAM perms needed), so no extra Lambda policy is required.
+  extra_env = {
+    STAK_AUTH_ENABLED         = tostring(var.auth_enabled)
+    STAK_COGNITO_USER_POOL_ID = module.cognito.user_pool_id
+    STAK_COGNITO_CLIENT_ID    = module.cognito.client_id
+    STAK_COGNITO_REGION       = var.aws_region
+  }
 }
 
 module "http_api" {
@@ -81,4 +106,16 @@ output "lambda_layer_name" {
 
 output "dynamodb_table" {
   value = module.dynamodb.table_name
+}
+
+output "cognito_user_pool_id" {
+  value = module.cognito.user_pool_id
+}
+
+output "cognito_client_id" {
+  value = module.cognito.client_id
+}
+
+output "cognito_issuer" {
+  value = module.cognito.issuer
 }

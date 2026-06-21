@@ -12,6 +12,9 @@ dependencies = [
     # AWS Lambda adapter: lets the same FastAPI app run behind API Gateway with
     # zero code change (Increment 8). Pure-python, tiny.
     "mangum>=0.17",
+    # Cognito access-token verification (RS256). ``crypto`` extra pulls in
+    # ``cryptography`` for signature checks (Increment 6b auth seam).
+    "pyjwt[crypto]>=2.8",
 ]
 
 [project.optional-dependencies]

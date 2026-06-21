@@ -10,6 +10,7 @@ from app.adapters.sqlite_repo import SqliteRepository
 from app.adapters.stub_llm import StubLLM
 from app.ports.llm import LLM
 from app.ports.repository import Repository
+from app.security import CognitoVerifier
 from app.settings import Settings
 
 
@@ -35,3 +36,14 @@ def build_llm(settings: Settings) -> LLM:
     # Anthropic / Bedrock adapters land in Increment 7; fall back to the stub so
     # the service still runs if a provider is selected before its adapter exists.
     return StubLLM(accountable_human=settings.accountable_human)
+
+
+def build_verifier(settings: Settings) -> CognitoVerifier | None:
+    """Build the Cognito token verifier, or ``None`` when auth is disabled."""
+    if not settings.auth_enabled:
+        return None
+    return CognitoVerifier(
+        jwks_url=settings.cognito_jwks_url,
+        issuer=settings.cognito_issuer,
+        client_id=settings.cognito_client_id,
+    )
