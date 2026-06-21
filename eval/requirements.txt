@@ -1,0 +1,5 @@
+# Dependencies for the Agent Eval Gate (eval/run_eval.py).
+# The harness reuses the real retrieval + grounded-answer code, so it only
+# needs the API service installed (which pulls in pydantic et al.). No model
+# SDKs, no network — the gate runs fully offline and zero-spend.
+-e ./services/api
