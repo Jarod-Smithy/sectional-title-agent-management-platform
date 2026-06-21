@@ -95,15 +95,14 @@ jobs:
         run: pytest --cov --cov-report=term-missing --cov-report=xml
       - name: Diff coverage (changed lines must stay covered — G5)
         if: steps.detect.outputs.present == 'true' && github.event_name == 'pull_request'
-        # BOOTSTRAP (temporary): the foundational PR introduces the whole API
-        # codebase at once, so 100% changed-line coverage would require tests
-        # for every defensive branch up front. Held at the project-wide
-        # standard (fail_under=90; this PR is ~97%) and restored to 100 in the
-        # coverage-hardening follow-up.
+        # Changed lines must be FULLY covered. The bootstrap relaxation
+        # (fail-under=90 for the foundational mega-PR) is retired now the
+        # codebase is in place: every new change ships with its own tests, so
+        # agent-authored code cannot land without exercising what it adds.
         run: |
           diff-cover coverage.xml \
             --compare-branch "origin/${{ github.event.pull_request.base.ref }}" \
-            --fail-under=90
+            --fail-under=100
 
   # ── Node typecheck + unit (guarded) ──────────────────────────────────
   node:

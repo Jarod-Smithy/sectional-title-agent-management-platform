@@ -22,6 +22,12 @@
 /.pre-commit-config.yaml    @Jarod-Smithy
 /eval/                      @Jarod-Smithy
 /tests/                     @Jarod-Smithy
+/policy/                    @Jarod-Smithy
 /infra/                     @Jarod-Smithy
 /CODEOWNERS                 @Jarod-Smithy
 /.github/CODEOWNERS         @Jarod-Smithy
+
+# Test suites stay human-owned even once /services/ is co-owned by the dev
+# agents, so agents cannot weaken the very tests that gate their own code (R2).
+# Listed last so it wins CODEOWNERS' last-match-wins precedence over /services/.
+/services/**/tests/         @Jarod-Smithy

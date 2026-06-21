@@ -62,9 +62,9 @@ output = "coverage.xml"
 
 [tool.mutmut]
 # Mutation testing on critical modules only (Plan §2 G5). Keeps runtime sane
-# while catching tests that pass without actually asserting behaviour. Extend
-# paths_to_mutate as critical modules land (PII redaction, scoring,
-# resolution-gate, versioning).
-paths_to_mutate = "services/,sdlc-agents/"
-tests_dir = "tests/"
+# while catching tests that pass without actually asserting behaviour. Scoped to
+# the safety-critical seams that exist today; extend as more land (PII
+# redaction, scoring, versioning).
+paths_to_mutate = "services/api/app/domain/guardrails.py,services/api/app/domain/intake.py,services/api/app/security/cognito.py"
+tests_dir = "services/api/tests/"
 runner = "python -m pytest -x -q"
