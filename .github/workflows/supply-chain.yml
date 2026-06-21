@@ -32,7 +32,7 @@ jobs:
     name: SBOM (Syft / SPDX)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Generate SBOM (SPDX JSON)
         uses: anchore/sbom-action@v0
@@ -43,14 +43,14 @@ jobs:
           output-file: sbom.spdx.json
 
       - name: Scan SBOM for known vulnerabilities (Grype)
-        uses: anchore/scan-action@v6
+        uses: anchore/scan-action@v7
         with:
           sbom: sbom.spdx.json
           severity-cutoff: high
           fail-build: true
 
       - name: Upload SBOM artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: sbom-spdx-json
           path: sbom.spdx.json
@@ -66,7 +66,7 @@ jobs:
       id-token: write # keyless cosign (OIDC)
       packages: write # push signed image/attestation
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Detect container build
         id: detect
