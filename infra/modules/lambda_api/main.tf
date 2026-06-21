@@ -24,6 +24,23 @@ variable "dynamodb_table_arn" {
   description = "ARN of the app DynamoDB table (scopes the runtime policy)."
 }
 
+variable "account_id" {
+  type        = string
+  description = "AWS account id (scopes the Bedrock inference-profile ARN)."
+}
+
+variable "bedrock_enabled" {
+  type        = bool
+  description = "Attach the Bedrock InvokeModel policy. Off = no standing perms."
+  default     = false
+}
+
+variable "bedrock_inference_region" {
+  type        = string
+  description = "Region of the Bedrock cross-region inference profile (Claude)."
+  default     = "eu-west-1"
+}
+
 variable "memory_mb" {
   type        = number
   description = "Lambda memory (MB)."
@@ -107,6 +124,33 @@ resource "aws_iam_role_policy" "dynamo" {
   name   = "${var.name_prefix}-dynamo"
   role   = aws_iam_role.exec.id
   policy = data.aws_iam_policy_document.dynamo.json
+}
+
+# Bedrock model invocation — only when explicitly enabled (zero standing perms
+# otherwise). Scoped to Anthropic Claude foundation-model copies across the EU
+# geo and the account's EU cross-region inference profiles; never Resource "*".
+data "aws_iam_policy_document" "bedrock" {
+  count = var.bedrock_enabled ? 1 : 0
+
+  statement {
+    sid    = "InvokeClaude"
+    effect = "Allow"
+    actions = [
+      "bedrock:InvokeModel",
+      "bedrock:InvokeModelWithResponseStream",
+    ]
+    resources = [
+      "arn:aws:bedrock:${var.bedrock_inference_region}:${var.account_id}:inference-profile/eu.anthropic.claude-*",
+      "arn:aws:bedrock:eu-*::foundation-model/anthropic.claude-*",
+    ]
+  }
+}
+
+resource "aws_iam_role_policy" "bedrock" {
+  count  = var.bedrock_enabled ? 1 : 0
+  name   = "${var.name_prefix}-bedrock"
+  role   = aws_iam_role.exec.id
+  policy = data.aws_iam_policy_document.bedrock[0].json
 }
 
 # ── Log group (explicit, so retention caps storage cost) ─────────────────────

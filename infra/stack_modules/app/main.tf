@@ -37,6 +37,19 @@ variable "auth_enabled" {
   default = false
 }
 
+# Bedrock inference plane (Increment 7). Off by default = provider stays 'stub'
+# (zero-spend) and NO Bedrock IAM is attached. Flip to true (and redeploy) to
+# route agent-assist through cross-region Claude in `bedrock_inference_region`.
+variable "bedrock_enabled" {
+  type    = bool
+  default = false
+}
+
+variable "bedrock_inference_region" {
+  type    = string
+  default = "eu-west-1"
+}
+
 module "tags" {
   source = "../../modules/tags"
 
@@ -62,22 +75,27 @@ module "cognito" {
 module "lambda_api" {
   source = "../../modules/lambda_api"
 
-  name_prefix         = var.name_prefix
-  aws_region          = var.aws_region
-  dynamodb_table_name = module.dynamodb.table_name
-  dynamodb_table_arn  = module.dynamodb.table_arn
-  memory_mb           = var.lambda_memory_mb
-  timeout_s           = var.lambda_timeout_s
-  log_retention_days  = var.log_retention_days
-  tags                = module.tags.tags
+  name_prefix              = var.name_prefix
+  aws_region               = var.aws_region
+  account_id               = var.account_id
+  dynamodb_table_name      = module.dynamodb.table_name
+  dynamodb_table_arn       = module.dynamodb.table_arn
+  memory_mb                = var.lambda_memory_mb
+  timeout_s                = var.lambda_timeout_s
+  log_retention_days       = var.log_retention_days
+  bedrock_enabled          = var.bedrock_enabled
+  bedrock_inference_region = var.bedrock_inference_region
+  tags                     = module.tags.tags
 
   # Cognito auth wiring. The verifier only fetches the pool's public JWKS over
   # HTTPS (no IAM perms needed), so no extra Lambda policy is required.
   extra_env = {
-    STAK_AUTH_ENABLED         = tostring(var.auth_enabled)
-    STAK_COGNITO_USER_POOL_ID = module.cognito.user_pool_id
-    STAK_COGNITO_CLIENT_ID    = module.cognito.client_id
-    STAK_COGNITO_REGION       = var.aws_region
+    STAK_AUTH_ENABLED             = tostring(var.auth_enabled)
+    STAK_COGNITO_USER_POOL_ID     = module.cognito.user_pool_id
+    STAK_COGNITO_CLIENT_ID        = module.cognito.client_id
+    STAK_COGNITO_REGION           = var.aws_region
+    STAK_LLM_PROVIDER             = var.bedrock_enabled ? "bedrock" : "stub"
+    STAK_BEDROCK_INFERENCE_REGION = var.bedrock_inference_region
   }
 }
 
