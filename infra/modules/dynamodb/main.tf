@@ -12,6 +12,12 @@ variable "tags" {
   default     = {}
 }
 
+# The table is encrypted at rest with the free AWS-owned key (see
+# server_side_encryption below). The IaC scanner prefers a customer-managed KMS
+# key, but a CMK adds ~$1/mo recurring cost which conflicts with the dev
+# zero-spend goal / $50 lifetime cap. Deferred to the prod-hardening follow-up
+# (POPIA key-custody), where a CMK is warranted for real PII.
+# nosemgrep: terraform.aws.security.aws-dynamodb-table-unencrypted.aws-dynamodb-table-unencrypted
 resource "aws_dynamodb_table" "app" {
   name         = var.table_name
   billing_mode = "PAY_PER_REQUEST"
