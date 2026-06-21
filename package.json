@@ -15,11 +15,11 @@
     "typecheck": "tsc -b --noEmit"
   },
   "devDependencies": {
-    "@commitlint/cli": "^19.0.0",
-    "@commitlint/config-conventional": "^19.0.0",
-    "eslint": "^9.0.0",
+    "@commitlint/cli": "^21.0.2",
+    "@commitlint/config-conventional": "^21.0.2",
+    "eslint": "^10.5.0",
     "prettier": "^3.3.0",
-    "typescript": "^5.5.0"
+    "typescript": "^6.0.3"
   },
   "engines": {
     "node": ">=20"
