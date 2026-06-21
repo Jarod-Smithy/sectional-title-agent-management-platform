@@ -37,6 +37,13 @@ resource "aws_dynamodb_table" "app" {
     enabled = false
   }
 
+  # Encryption at rest with the AWS-owned key (free; no KMS charges). Satisfies
+  # the IaC scanner; a customer-managed KMS key can be swapped in later if a
+  # compliance requirement demands key custody.
+  server_side_encryption {
+    enabled = true
+  }
+
   tags = var.tags
 }
 

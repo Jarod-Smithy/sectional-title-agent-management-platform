@@ -76,6 +76,13 @@ resource "aws_iam_role_policy_attachment" "logs" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
+# X-Ray write permissions for active tracing (enabled below). Free tier covers
+# 100k traces/month — effectively $0 at this volume.
+resource "aws_iam_role_policy_attachment" "xray" {
+  role       = aws_iam_role.exec.name
+  policy_arn = "arn:aws:iam::aws:policy/AWSXRayDaemonWriteAccess"
+}
+
 # Runtime access to the single table only.
 data "aws_iam_policy_document" "dynamo" {
   statement {
@@ -147,6 +154,11 @@ resource "aws_lambda_function" "api" {
 
   environment {
     variables = merge(local.base_env, var.extra_env)
+  }
+
+  # End-to-end request tracing (X-Ray). Permissions attached above.
+  tracing_config {
+    mode = "Active"
   }
 
   # CI owns code + layers; do not let terraform revert them.
