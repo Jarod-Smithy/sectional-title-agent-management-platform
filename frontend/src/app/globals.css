@@ -1,0 +1,309 @@
+/* Trustee Platform — monday.com look & feel.
+   Design tokens ported from prototype/web/styles.css. All visual values live in
+   :root so the theme + status colours stay centralised. */
+:root {
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --surface-2: #f6f7fb;
+  --field: #ffffff;
+  --ink: #171a22;
+  --ink-soft: #676879;
+  --ink-faint: #9699a6;
+  --border: #e6e9ef;
+  --on-ink: #ffffff;
+
+  --accent: #6161ff;
+  --accent-text: #4b4be0;
+  --accent-hover: #5034ff;
+  --brand-tint: #edeeff;
+
+  --success: #0a7d4c;
+  --success-bd: #00c875;
+  --success-bg: #e6f8f0;
+  --warn: #b25e00;
+  --warn-bd: #fdab3d;
+  --warn-bg: #fff3e2;
+  --block: #c8364a;
+  --block-bd: #e2445c;
+  --block-bg: #fce8eb;
+
+  --status-done: #00c875;
+  --status-working: #fdab3d;
+  --status-stuck: #d43b53;
+  --status-info: #579bfc;
+  --status-purple: #8e44d8;
+  --status-pink: #ff5ac4;
+  --status-yellow: #ffcb00;
+
+  --radius: 12px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+  --radius-sm: 8px;
+  --radius-chip: 5px;
+  --shadow: 0 6px 20px rgba(23, 26, 34, 0.08);
+  --shadow-sm: 0 1px 3px rgba(23, 26, 34, 0.06);
+
+  --font-sans: var(--font-poppins), system-ui, -apple-system, "Segoe UI", Roboto,
+    sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+body {
+  font: 16px/1.55 var(--font-sans);
+  background: var(--surface-2);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+}
+a {
+  color: var(--accent-text);
+}
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px 32px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+.app-header h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.app-header .scheme {
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+.header-right {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  color: var(--ink-soft);
+  font-size: 14px;
+}
+
+.tabs {
+  display: flex;
+  gap: 6px;
+  padding: 12px 32px 0;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.tabs button {
+  border: none;
+  background: transparent;
+  color: var(--ink-soft);
+  font: 600 14px var(--font-sans);
+  padding: 10px 16px;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+}
+.tabs button.active {
+  color: var(--accent-text);
+  border-bottom-color: var(--accent);
+}
+
+main.content {
+  padding: 24px 32px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+.two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+@media (max-width: 880px) {
+  .two-col {
+    grid-template-columns: 1fr;
+  }
+}
+
+.panel {
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 20px 22px;
+}
+.panel h2 {
+  margin: 0 0 12px;
+  font-size: 17px;
+  font-weight: 700;
+}
+.hint {
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+label {
+  display: block;
+  margin: 10px 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+input,
+select,
+textarea {
+  width: 100%;
+  margin-top: 4px;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font: 15px var(--font-sans);
+  background: var(--field);
+  color: var(--ink);
+}
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--brand-tint);
+}
+
+button.btn {
+  border: none;
+  background: var(--accent);
+  color: var(--on-ink);
+  font: 600 14px var(--font-sans);
+  padding: 10px 18px;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition:
+    background 150ms ease,
+    transform 150ms ease;
+}
+button.btn:hover {
+  background: var(--accent-hover);
+  transform: translateY(-1px);
+}
+button.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+button.ghost {
+  background: var(--surface-2);
+  color: var(--ink);
+  border: 1px solid var(--border);
+}
+button.ghost:hover {
+  background: var(--brand-tint);
+}
+
+.chip {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: var(--radius-chip);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.board {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+@media (max-width: 720px) {
+  .board {
+    grid-template-columns: 1fr;
+    overflow-x: auto;
+  }
+}
+.board .col {
+  background: var(--surface-2);
+  border-radius: var(--radius);
+  padding: 12px;
+}
+.board .col h3 {
+  margin: 0 0 10px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-faint);
+}
+.card {
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
+  padding: 12px;
+  margin-bottom: 10px;
+  border-left: 4px solid var(--accent);
+}
+.card h4 {
+  margin: 0 0 6px;
+  font-size: 14px;
+}
+.card .meta {
+  color: var(--ink-faint);
+  font-size: 12px;
+}
+.card-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+.card-actions button {
+  font-size: 12px;
+  padding: 5px 10px;
+}
+
+.list-row {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.list-row:last-child {
+  border-bottom: none;
+}
+
+.banner {
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  margin-bottom: 14px;
+}
+.banner.error {
+  background: var(--block-bg);
+  color: var(--block);
+}
+.banner.info {
+  background: var(--brand-tint);
+  color: var(--accent-text);
+}
+
+.center-screen {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+.login-card {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  padding: 32px;
+  width: 100%;
+  max-width: 380px;
+}
+.login-card h1 {
+  margin: 0 0 4px;
+  font-size: 22px;
+}
