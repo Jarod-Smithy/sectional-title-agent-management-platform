@@ -8,9 +8,9 @@ from __future__ import annotations
 from datetime import date
 from typing import Annotated
 
-from fastapi import APIRouter, Body, HTTPException, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, Request
 
-from app.api.deps import LLMDep, RepoDep, SettingsDep
+from app.api.deps import LLMDep, RepoDep, SettingsDep, get_current_user
 from app.domain import drafting, intake, rag
 from app.domain import seed as seed_module
 from app.schemas import (
@@ -35,6 +35,12 @@ from app.schemas import (
 
 router = APIRouter(prefix="/api")
 
+# Health is unauthenticated (deploy smoke test + load-balancer probes hit it
+# with no token). Everything else requires an authenticated principal when
+# ``auth_enabled`` is on; the dependency is a no-op (synthetic dev user) when off.
+public_router = APIRouter(prefix="/api")
+router = APIRouter(prefix="/api", dependencies=[Depends(get_current_user)])
+
 
 def _runtime(request: Request) -> dict[str, bool]:
     runtime: dict[str, bool] = request.app.state.runtime
@@ -42,7 +48,7 @@ def _runtime(request: Request) -> dict[str, bool]:
 
 
 # ── Health ───────────────────────────────────────────────────────────────────
-@router.get("/health", response_model=Health)
+@public_router.get("/health", response_model=Health)
 def health(request: Request, settings: SettingsDep) -> Health:
     rt = _runtime(request)
     available = rt["assist_enabled"] and not rt["kill_switch"]

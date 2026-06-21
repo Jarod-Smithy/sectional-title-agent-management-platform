@@ -67,6 +67,17 @@ class Settings(BaseSettings):
     assist_enabled: bool = True
     assist_kill_switch: bool = False
 
+    # ── Auth (Cognito JWT) ───────────────────────────────────────────────────
+    # Off by default so local/dev/CI run unauthenticated; production sets
+    # STAK_AUTH_ENABLED=true once the pool/client (Terraform) and a trustee user
+    # exist. When enabled, every route except /api/health requires a valid
+    # Cognito access token (RS256, verified against the pool's public JWKS).
+    auth_enabled: bool = False
+    cognito_user_pool_id: str = ""
+    cognito_client_id: str = ""
+    # Region the user pool lives in; empty falls back to ``aws_region``.
+    cognito_region: str = ""
+
     # ── Web (static dashboard) ───────────────────────────────────────────────
     # Served only in local/dev; in production CloudFront + S3 host the SPA.
     serve_static: bool = True
@@ -78,6 +89,24 @@ class Settings(BaseSettings):
     @property
     def db_path(self) -> Path:
         return self.data_dir / self.sqlite_filename
+
+    @property
+    def cognito_pool_region(self) -> str:
+        """Region of the Cognito user pool (falls back to ``aws_region``)."""
+        return self.cognito_region or self.aws_region
+
+    @property
+    def cognito_issuer(self) -> str:
+        """Expected ``iss`` claim / JWKS base for the configured user pool."""
+        return (
+            f"https://cognito-idp.{self.cognito_pool_region}.amazonaws.com/"
+            f"{self.cognito_user_pool_id}"
+        )
+
+    @property
+    def cognito_jwks_url(self) -> str:
+        """Public signing-key set used to verify access-token signatures."""
+        return f"{self.cognito_issuer}/.well-known/jwks.json"
 
     @property
     def model_tiers(self) -> dict[str, ModelTier]:
