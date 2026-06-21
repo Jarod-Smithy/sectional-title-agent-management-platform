@@ -1,0 +1,48 @@
+{
+  "name": "conduct-and-levies",
+  "description": "Core trustee Q&A grounding cases over a tiny conduct-rules + levy corpus. Exercises grounded-citation, fabricated-citation (refusal), and date/version retrieval correctness against the deterministic StubLLM.",
+  "documents": [
+    {
+      "title": "Conduct Rules 2024 (v3)",
+      "content": "Quiet Hours: Quiet hours are from 22:00 to 06:00 every day.\nPets: No pets may be kept in any unit without prior written consent of the trustees.\nEffective: These conduct rules, version 3, took effect on 1 March 2024."
+    },
+    {
+      "title": "Levy Schedule 2025",
+      "content": "The monthly levy for the 2025 financial year is R1 850, payable on the first day of each month. Late payments accrue interest at 2 percent per month."
+    }
+  ],
+  "cases": [
+    {
+      "id": "quiet-hours",
+      "question": "What are the quiet hours?",
+      "answerable": true,
+      "expected_sources": ["Conduct Rules 2024 (v3)"]
+    },
+    {
+      "id": "pets-allowed",
+      "question": "Are pets allowed in the units?",
+      "answerable": true,
+      "expected_sources": ["Conduct Rules 2024 (v3)"]
+    },
+    {
+      "id": "levy-amount-2025",
+      "question": "How much is the monthly levy for 2025?",
+      "answerable": true,
+      "expected_sources": ["Levy Schedule 2025"],
+      "expected_fact": "R1 850"
+    },
+    {
+      "id": "conduct-effective-date",
+      "question": "When did the current conduct rules take effect?",
+      "answerable": true,
+      "expected_sources": ["Conduct Rules 2024 (v3)"],
+      "expected_fact": "1 March 2024"
+    },
+    {
+      "id": "unknown-wifi",
+      "question": "What is the wifi password for the clubhouse?",
+      "answerable": false,
+      "expected_sources": []
+    }
+  ]
+}
