@@ -110,6 +110,7 @@ data "aws_iam_policy_document" "dynamo" {
       "dynamodb:UpdateItem",
       "dynamodb:DeleteItem",
       "dynamodb:Query",
+      "dynamodb:Scan",
       "dynamodb:BatchGetItem",
       "dynamodb:BatchWriteItem",
     ]
