@@ -27,4 +27,12 @@ inputs = {
   #   scoped Bedrock InvokeModel IAM (cross-region Claude in eu-west-1).
   repo_backend    = "dynamodb"
   bedrock_enabled = true
+
+  # De-prototype edges (Increment 8):
+  # - seed_enabled=true keeps the demo "Acacia Heights" dashboard populated in dev.
+  # - documents_enabled=true provisions the private uploads bucket + presigned PUT/GET.
+  # - email stays in "log" mode (email_enabled=false) until an SES from-identity is
+  #   verified out-of-band; flip email_enabled=true + set email_from after verifying.
+  seed_enabled      = true
+  documents_enabled = true
 }

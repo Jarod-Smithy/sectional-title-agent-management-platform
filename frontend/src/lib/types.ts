@@ -23,6 +23,17 @@ export interface DocumentIn {
   overwrite?: boolean;
 }
 
+export interface DocumentUploadUrlIn {
+  filename: string;
+  contentType: string;
+}
+
+export interface DocumentUploadUrlOut {
+  documentId: string;
+  key: string;
+  uploadUrl: string;
+}
+
 export interface AnalyzeIn {
   content: string;
   filename?: string;

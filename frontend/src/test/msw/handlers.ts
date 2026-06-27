@@ -1,8 +1,18 @@
 import { http, HttpResponse } from "msw";
 import { config } from "@/lib/config";
-import type { AskOut, Document, Health, Ticket } from "@/lib/types";
+import type {
+  AskOut,
+  Document,
+  DocumentUploadUrlOut,
+  Health,
+  Ticket,
+} from "@/lib/types";
 
 const base = config.apiBase;
+
+/** Stable presigned-URL stand-in returned by the upload-url handler. */
+export const sampleUploadUrl =
+  "https://s3.test.local/bucket/docs/new-doc?sig=abc";
 
 export const sampleDocuments: Document[] = [
   {
@@ -63,6 +73,27 @@ export const handlers = [
       created_at: "2024-06-01T00:00:00Z",
     } satisfies Document);
   }),
+  http.post(`${base}/api/documents/upload-url`, async ({ request }) => {
+    const body = (await request.json()) as {
+      filename: string;
+      contentType: string;
+    };
+    return HttpResponse.json({
+      documentId: "doc-42",
+      key: `incoming/${body.filename}`,
+      uploadUrl: sampleUploadUrl,
+    } satisfies DocumentUploadUrlOut);
+  }),
+  http.put(sampleUploadUrl, () => new HttpResponse(null, { status: 200 })),
+  http.post(`${base}/api/documents/:documentId/confirm`, ({ params }) =>
+    HttpResponse.json({
+      id: 2,
+      title: `Stored ${String(params.documentId)}`,
+      category: "general",
+      effective_date: "2024-06-01",
+      created_at: "2024-06-01T00:00:00Z",
+    } satisfies Document),
+  ),
   http.get(`${base}/api/tickets`, () => HttpResponse.json(sampleTickets)),
   http.get(`${base}/api/resolutions`, () => HttpResponse.json([])),
   http.get(`${base}/api/drafts`, () => HttpResponse.json([])),

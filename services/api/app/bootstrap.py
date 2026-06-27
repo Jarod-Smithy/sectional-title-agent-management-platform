@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from app.adapters.sqlite_repo import SqliteRepository
 from app.adapters.stub_llm import StubLLM
+from app.ports.documents import DocumentStore
+from app.ports.email import EmailSender
 from app.ports.llm import LLM
 from app.ports.repository import Repository
 from app.security import CognitoVerifier
@@ -56,3 +58,37 @@ def build_verifier(settings: Settings) -> CognitoVerifier | None:
         issuer=settings.cognito_issuer,
         client_id=settings.cognito_client_id,
     )
+
+
+def build_email_sender(settings: Settings) -> EmailSender:
+    """Select the outbound-email adapter from settings.
+
+    Default ``log`` is an offline no-op (dev/CI safe). ``ses`` sends through
+    Amazon SES from ``email_from`` in ``email_resolved_region``.
+    """
+    if settings.email_provider == "ses":
+        import boto3
+
+        from app.adapters.ses_email import SesEmailSender
+
+        client = boto3.client("ses", region_name=settings.email_resolved_region)
+        return SesEmailSender(client=client, sender=settings.email_from)
+    from app.adapters.ses_email import LogEmailSender
+
+    return LogEmailSender(sender=settings.email_from)
+
+
+def build_document_store(settings: Settings) -> DocumentStore | None:
+    """Build the S3 document store, or ``None`` when no bucket is configured.
+
+    ``None`` disables the upload endpoints (503) while the paste-text path keeps
+    working — the dev-safe default (zero standing storage).
+    """
+    if not settings.documents_bucket:
+        return None
+    import boto3
+
+    from app.adapters.s3_documents import S3DocumentStore
+
+    client = boto3.client("s3", region_name=settings.documents_resolved_region)
+    return S3DocumentStore(client=client, bucket=settings.documents_bucket)

@@ -7,6 +7,8 @@ import type {
   AssistConfig,
   Document,
   DocumentIn,
+  DocumentUploadUrlIn,
+  DocumentUploadUrlOut,
   Draft,
   DraftEdit,
   EmailIn,
@@ -100,6 +102,45 @@ export class ApiClient {
       method: "POST",
       body: payload,
     });
+  }
+
+  /** Step 1 of the upload flow: ask the API for a presigned S3 PUT URL. */
+  requestDocumentUploadUrl(
+    payload: DocumentUploadUrlIn,
+  ): Promise<DocumentUploadUrlOut> {
+    return this.request<DocumentUploadUrlOut>("/api/documents/upload-url", {
+      method: "POST",
+      body: payload,
+    });
+  }
+
+  /**
+   * Step 2 of the upload flow: PUT the raw file bytes straight to S3 using the
+   * presigned URL. This bypasses {@link request} on purpose — the presigned URL
+   * is absolute and must NOT carry the API base or the `Authorization` bearer
+   * (S3 authenticates via the signature embedded in the URL). The `Content-Type`
+   * must match what was signed in step 1.
+   */
+  async uploadFileToS3(uploadUrl: string, file: File): Promise<void> {
+    const res = await fetch(uploadUrl, {
+      method: "PUT",
+      headers: { "Content-Type": file.type || "application/octet-stream" },
+      body: file,
+    });
+    if (!res.ok) {
+      throw new ApiError(
+        res.status,
+        res.statusText || "Upload to storage failed",
+      );
+    }
+  }
+
+  /** Step 3 of the upload flow: confirm the upload and persist the document. */
+  confirmDocument(documentId: string): Promise<Document> {
+    return this.request<Document>(
+      `/api/documents/${encodeURIComponent(documentId)}/confirm`,
+      { method: "POST" },
+    );
   }
 
   // ── Ask (document brain) ──────────────────────────────────────────────────

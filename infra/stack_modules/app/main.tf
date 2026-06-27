@@ -64,6 +64,42 @@ variable "repo_backend" {
   }
 }
 
+# Demo seeding. Off by default so real deployments never auto-populate the
+# sample "Acacia Heights" scheme; the dev live stack opts in to keep the demo
+# dashboard populated. Drives STAK_SEED_ENABLED.
+variable "seed_enabled" {
+  type    = bool
+  default = false
+}
+
+# Outbound email plane (Increment 8). Off by default = provider stays 'log' (a
+# dev-safe no-op that only records the interaction) and NO SES identity/IAM is
+# created. Flip to true (and set email_from) to register an SES email identity
+# and route approved/auto-filed replies through it. NOTE: the from-identity must
+# be confirmed out-of-band via the link SES emails before delivery works.
+variable "email_enabled" {
+  type    = bool
+  default = false
+}
+
+variable "email_from" {
+  type    = string
+  default = ""
+}
+
+# Document-upload plane (Increment 8). Off by default = no S3 bucket/IAM and the
+# upload endpoints return 503 (paste-text path still works). Flip to true to
+# provision the private uploads bucket and enable presigned PUT/GET.
+variable "documents_enabled" {
+  type    = bool
+  default = false
+}
+
+variable "documents_allowed_origins" {
+  type    = list(string)
+  default = ["*"]
+}
+
 module "tags" {
   source = "../../modules/tags"
 
@@ -86,6 +122,26 @@ module "cognito" {
   tags        = module.tags.tags
 }
 
+# Outbound email identity (SES) — only created when email_enabled. The
+# from-address must be verified out-of-band (SES emails a confirmation link)
+# before delivery works; until then keep provider "log".
+module "ses" {
+  source = "../../modules/ses"
+  count  = var.email_enabled ? 1 : 0
+
+  email_address = var.email_from
+}
+
+# Private uploads bucket (S3) — only created when documents_enabled. Bucket
+# names are global, so suffix with the account id for uniqueness.
+module "s3_docs" {
+  source = "../../modules/s3_docs"
+  count  = var.documents_enabled ? 1 : 0
+
+  bucket_name     = "${var.name_prefix}-docs-${var.account_id}"
+  allowed_origins = var.documents_allowed_origins
+}
+
 module "lambda_api" {
   source = "../../modules/lambda_api"
 
@@ -99,6 +155,8 @@ module "lambda_api" {
   log_retention_days       = var.log_retention_days
   bedrock_enabled          = var.bedrock_enabled
   bedrock_inference_region = var.bedrock_inference_region
+  email_identity_arn       = var.email_enabled ? module.ses[0].identity_arn : ""
+  documents_bucket_arn     = var.documents_enabled ? module.s3_docs[0].bucket_arn : ""
   tags                     = module.tags.tags
 
   # Cognito auth wiring. The verifier only fetches the pool's public JWKS over
@@ -111,6 +169,10 @@ module "lambda_api" {
     STAK_LLM_PROVIDER             = var.bedrock_enabled ? "bedrock" : "stub"
     STAK_BEDROCK_INFERENCE_REGION = var.bedrock_inference_region
     STAK_REPO_BACKEND             = var.repo_backend
+    STAK_SEED_ENABLED             = tostring(var.seed_enabled)
+    STAK_EMAIL_PROVIDER           = var.email_enabled ? "ses" : "log"
+    STAK_EMAIL_FROM               = var.email_from
+    STAK_DOCUMENTS_BUCKET         = var.documents_enabled ? module.s3_docs[0].bucket_name : ""
   }
 }
 
