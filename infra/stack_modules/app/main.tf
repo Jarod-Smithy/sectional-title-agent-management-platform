@@ -157,6 +157,8 @@ module "lambda_api" {
   bedrock_inference_region = var.bedrock_inference_region
   email_identity_arn       = var.email_enabled ? module.ses[0].identity_arn : ""
   documents_bucket_arn     = var.documents_enabled ? module.s3_docs[0].bucket_arn : ""
+  email_enabled            = var.email_enabled
+  documents_enabled        = var.documents_enabled
   tags                     = module.tags.tags
 
   # Cognito auth wiring. The verifier only fetches the pool's public JWKS over

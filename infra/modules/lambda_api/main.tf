@@ -53,6 +53,19 @@ variable "documents_bucket_arn" {
   default     = ""
 }
 
+# Plan-time toggles: count/for_each cannot depend on values that are unknown
+# until apply (the bucket/identity ARNs are computed during create), so the
+# IAM policies gate on these booleans instead of on the ARN strings.
+variable "email_enabled" {
+  type    = bool
+  default = false
+}
+
+variable "documents_enabled" {
+  type    = bool
+  default = false
+}
+
 variable "memory_mb" {
   type        = number
   description = "Lambda memory (MB)."
@@ -186,7 +199,7 @@ resource "aws_iam_role_policy" "bedrock" {
 # Outbound email via SES — only when an identity ARN is supplied (zero standing
 # perms otherwise). Scoped to the single verified from-identity; never "*".
 data "aws_iam_policy_document" "ses" {
-  count = var.email_identity_arn != "" ? 1 : 0
+  count = var.email_enabled ? 1 : 0
 
   statement {
     sid    = "SendTrusteeReplies"
@@ -200,7 +213,7 @@ data "aws_iam_policy_document" "ses" {
 }
 
 resource "aws_iam_role_policy" "ses" {
-  count  = var.email_identity_arn != "" ? 1 : 0
+  count  = var.email_enabled ? 1 : 0
   name   = "${var.name_prefix}-ses"
   role   = aws_iam_role.exec.id
   policy = data.aws_iam_policy_document.ses[0].json
@@ -209,7 +222,7 @@ resource "aws_iam_role_policy" "ses" {
 # Document uploads via S3 — only when a bucket ARN is supplied. Object-level
 # read/write on the uploads bucket only (presigned PUT + server-side GET/list).
 data "aws_iam_policy_document" "documents" {
-  count = var.documents_bucket_arn != "" ? 1 : 0
+  count = var.documents_enabled ? 1 : 0
 
   statement {
     sid    = "ReadWriteUploads"
@@ -227,7 +240,7 @@ data "aws_iam_policy_document" "documents" {
 }
 
 resource "aws_iam_role_policy" "documents" {
-  count  = var.documents_bucket_arn != "" ? 1 : 0
+  count  = var.documents_enabled ? 1 : 0
   name   = "${var.name_prefix}-documents"
   role   = aws_iam_role.exec.id
   policy = data.aws_iam_policy_document.documents[0].json
