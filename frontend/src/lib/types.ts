@@ -176,3 +176,13 @@ export interface IssueCreatedOut {
   url: string;
   created: boolean;
 }
+
+export interface FeatureRequestIn {
+  title: string;
+  details?: string;
+}
+
+export interface FeatureRequestAck {
+  status: "pending_approval";
+  approver: string;
+}

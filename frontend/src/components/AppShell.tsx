@@ -8,9 +8,16 @@ import { AskTab } from "@/components/tabs/AskTab";
 import { BoardTab } from "@/components/tabs/BoardTab";
 import { DocumentsTab } from "@/components/tabs/DocumentsTab";
 import { InboxTab } from "@/components/tabs/InboxTab";
+import { RequestTab } from "@/components/tabs/RequestTab";
 import { ResolutionsTab } from "@/components/tabs/ResolutionsTab";
 
-type TabKey = "inbox" | "board" | "resolutions" | "ask" | "documents";
+type TabKey =
+  | "inbox"
+  | "board"
+  | "resolutions"
+  | "ask"
+  | "documents"
+  | "request";
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: "inbox", label: "Inbox" },
@@ -18,6 +25,7 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: "resolutions", label: "Resolutions" },
   { key: "ask", label: "Ask the Records" },
   { key: "documents", label: "Documents" },
+  { key: "request", label: "Request a Feature" },
 ];
 
 export function AppShell() {
@@ -60,6 +68,7 @@ export function AppShell() {
           {active === "resolutions" && <ResolutionsTab />}
           {active === "ask" && <AskTab />}
           {active === "documents" && <DocumentsTab />}
+          {active === "request" && <RequestTab />}
         </ErrorBoundary>
       </main>
     </>

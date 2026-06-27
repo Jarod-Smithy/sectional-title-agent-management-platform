@@ -11,15 +11,16 @@ from pathlib import PurePosixPath
 from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Request
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
 from app.adapters.s3_documents import extract_text
-from app.api.deps import LLMDep, RepoDep, SettingsDep, get_current_user
-from app.domain import drafting, intake, rag
+from app.api.deps import CurrentUser, LLMDep, RepoDep, SettingsDep, get_current_user
+from app.domain import approvals, drafting, intake, rag
 from app.domain import sdlc as sdlc_domain
 from app.domain import seed as seed_module
 from app.ports.documents import DocumentStore
-from app.ports.email import EmailSender
+from app.ports.email import EmailError, EmailSender
 from app.ports.sdlc import IssueTracker, IssueTrackerError
 from app.schemas import (
     AnalyzeIn,
@@ -33,6 +34,8 @@ from app.schemas import (
     Draft,
     DraftEdit,
     EmailIn,
+    FeatureRequestAck,
+    FeatureRequestIn,
     Health,
     InboxOut,
     IssueCreatedOut,
@@ -353,6 +356,73 @@ def report_bug(payload: BugReportIn, request: Request) -> IssueCreatedOut:
     except IssueTrackerError as exc:
         raise HTTPException(status_code=502, detail="Could not file the bug report.") from exc
     return IssueCreatedOut(number=ref.number, url=ref.url, created=ref.number > 0)
+
+
+# ── SDLC: feature request → emailed approval magic-link → feature issue ───────
+@router.post("/feature-request", response_model=FeatureRequestAck)
+def feature_request(
+    payload: FeatureRequestIn,
+    user: CurrentUser,
+    settings: SettingsDep,
+    request: Request,
+) -> FeatureRequestAck:
+    """Email an HMAC-signed approval link to the configured approver.
+
+    No issue is created here — opening the link (``/feature-request/approve``)
+    is what files it. Returns 503 until the approver/secret/base URL are set.
+    """
+    if not (settings.approver_email and settings.approval_secret and settings.public_base_url):
+        raise HTTPException(status_code=503, detail="Feature-request approval is not configured.")
+    token = approvals.make_token(
+        secret=settings.approval_secret,
+        claims={
+            "title": payload.title,
+            "details": payload.details,
+            "requester": user.username,
+        },
+        ttl_seconds=settings.feature_request_ttl_seconds,
+    )
+    link = f"{settings.public_base_url.rstrip('/')}/api/feature-request/approve?token={token}"
+    subject, body = sdlc_domain.approval_email(
+        title=payload.title, requester=user.username, link=link
+    )
+    try:
+        _email_sender(request).send(to=settings.approver_email, subject=subject, body=body)
+    except EmailError as exc:
+        raise HTTPException(status_code=502, detail="Could not send the approval email.") from exc
+    return FeatureRequestAck(status="pending_approval", approver=settings.approver_email)
+
+
+@public_router.get("/feature-request/approve", response_class=HTMLResponse)
+def approve_feature_request(token: str, settings: SettingsDep, request: Request) -> HTMLResponse:
+    """Validate the magic-link token and file the feature as an issue.
+
+    Public (the approver clicks it from email, with no session). The HMAC token
+    is the authorisation; an invalid/expired token is a 400.
+    """
+    try:
+        claims = approvals.read_token(secret=settings.approval_secret, token=token)
+    except approvals.ApprovalError as exc:
+        raise HTTPException(status_code=400, detail="Invalid or expired approval link.") from exc
+    title, body = sdlc_domain.format_feature_request(
+        title=str(claims.get("title", "")),
+        details=str(claims.get("details", "")),
+        requester=str(claims.get("requester", "")),
+    )
+    try:
+        ref = _issue_tracker(request).create_issue(
+            title=title, body=body, labels=("ai-sdlc", "feature")
+        )
+    except IssueTrackerError as exc:
+        raise HTTPException(status_code=502, detail="Could not file the feature issue.") from exc
+    link = (
+        f'<p><a href="{ref.url}">View the tracked issue.</a></p>'
+        if ref.number > 0
+        else "<p>The request was logged.</p>"
+    )
+    return HTMLResponse(
+        f"<!doctype html><html><body><h1>Feature request approved</h1>{link}</body></html>"
+    )
 
 
 # ── Assist config (global toggle + kill-switch) ──────────────────────────────

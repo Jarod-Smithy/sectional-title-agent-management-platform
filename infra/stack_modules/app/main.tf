@@ -126,6 +126,21 @@ variable "sdlc_region" {
   default = "eu-west-1"
 }
 
+# Feature-request approval flow. When approver_email is set, an HMAC-signed
+# approval secret is generated and the approval magic-link points back to
+# public_base_url (the API origin). The approver receives the link via SES
+# (requires email_enabled), and opening it files an ai-sdlc/feature issue.
+variable "approver_email" {
+  type    = string
+  default = ""
+}
+
+variable "public_base_url" {
+  type        = string
+  description = "API origin for approval magic-links (e.g. the API Gateway URL). Set explicitly to avoid a Lambda↔API dependency cycle."
+  default     = ""
+}
+
 module "tags" {
   source = "../../modules/tags"
 
@@ -146,6 +161,15 @@ module "cognito" {
 
   name_prefix = var.name_prefix
   tags        = module.tags.tags
+}
+
+# HMAC key that signs feature-request approval magic-links. Generated (never
+# committed) and injected into the Lambda env; only created when the approval
+# flow is enabled (approver_email set).
+resource "random_password" "approval_secret" {
+  count   = var.approver_email != "" ? 1 : 0
+  length  = 48
+  special = false
 }
 
 # Outbound email identity (SES) — only created when email_enabled. The
@@ -207,6 +231,9 @@ module "lambda_api" {
     STAK_GITHUB_REPO              = var.github_repo
     STAK_GITHUB_SECRET_NAME       = var.sdlc_secret_name
     STAK_SDLC_REGION              = var.sdlc_region
+    STAK_APPROVER_EMAIL           = var.approver_email
+    STAK_APPROVAL_SECRET          = var.approver_email != "" ? random_password.approval_secret[0].result : ""
+    STAK_PUBLIC_BASE_URL          = var.public_base_url
   }
 }
 

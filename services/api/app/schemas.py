@@ -187,5 +187,15 @@ class IssueCreatedOut(BaseModel):
     created: bool
 
 
+class FeatureRequestIn(BaseModel):
+    title: str = Field(min_length=3, max_length=200)
+    details: str = Field(default="", max_length=4000)
+
+
+class FeatureRequestAck(BaseModel):
+    status: Literal["pending_approval"]
+    approver: str
+
+
 # Resolve forward references now that Draft and Ticket are defined.
 InboxOut.model_rebuild()
