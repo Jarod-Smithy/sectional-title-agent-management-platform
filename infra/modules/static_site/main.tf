@@ -109,6 +109,12 @@ resource "aws_cloudfront_response_headers_policy" "security" {
 # *.cloudfront.net certificate — NO custom domain/ACM (those would need a
 # us-east-1 cert; not used here). SPA fallback: 403/404 → /index.html (200) so
 # deep links and client-side routes resolve to the app shell.
+#
+# nosemgrep justification: the default *.cloudfront.net certificate is fixed to
+# TLSv1 by AWS; minimum_protocol_version cannot be raised to TLSv1.2_2021
+# without a custom domain + ACM certificate (intentionally avoided for cost).
+# Viewer traffic is still forced to HTTPS via viewer_protocol_policy below.
+# nosemgrep: terraform.aws.security.aws-cloudfront-insecure-tls.aws-insecure-cloudfront-distribution-tls-version
 resource "aws_cloudfront_distribution" "site" {
   enabled             = true
   is_ipv6_enabled     = true
