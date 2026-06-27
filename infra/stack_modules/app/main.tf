@@ -50,6 +50,20 @@ variable "bedrock_inference_region" {
   default = "eu-west-1"
 }
 
+# Repository backend for the API. Defaults to ephemeral SQLite (dev-safe, on
+# Lambda /tmp). Set to "dynamodb" for durable single-table storage; the table
+# and the Lambda's DynamoDB IAM are provisioned by this stack regardless, so
+# flipping this is the only step needed to use durable storage.
+variable "repo_backend" {
+  type    = string
+  default = "sqlite"
+
+  validation {
+    condition     = contains(["sqlite", "dynamodb"], var.repo_backend)
+    error_message = "repo_backend must be either \"sqlite\" or \"dynamodb\"."
+  }
+}
+
 module "tags" {
   source = "../../modules/tags"
 
@@ -96,6 +110,7 @@ module "lambda_api" {
     STAK_COGNITO_REGION           = var.aws_region
     STAK_LLM_PROVIDER             = var.bedrock_enabled ? "bedrock" : "stub"
     STAK_BEDROCK_INFERENCE_REGION = var.bedrock_inference_region
+    STAK_REPO_BACKEND             = var.repo_backend
   }
 }
 
