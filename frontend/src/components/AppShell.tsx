@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useAuth } from "@/lib/auth";
+import { useApi } from "@/lib/useApi";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AskTab } from "@/components/tabs/AskTab";
 import { BoardTab } from "@/components/tabs/BoardTab";
 import { DocumentsTab } from "@/components/tabs/DocumentsTab";
@@ -20,6 +22,7 @@ const TABS: { key: TabKey; label: string }[] = [
 
 export function AppShell() {
   const { email, signOut } = useAuth();
+  const api = useApi();
   const [active, setActive] = useState<TabKey>("inbox");
 
   return (
@@ -51,11 +54,13 @@ export function AppShell() {
       </nav>
 
       <main className="content">
-        {active === "inbox" && <InboxTab />}
-        {active === "board" && <BoardTab />}
-        {active === "resolutions" && <ResolutionsTab />}
-        {active === "ask" && <AskTab />}
-        {active === "documents" && <DocumentsTab />}
+        <ErrorBoundary report={(payload) => api.reportBug(payload)}>
+          {active === "inbox" && <InboxTab />}
+          {active === "board" && <BoardTab />}
+          {active === "resolutions" && <ResolutionsTab />}
+          {active === "ask" && <AskTab />}
+          {active === "documents" && <DocumentsTab />}
+        </ErrorBoundary>
       </main>
     </>
   );
