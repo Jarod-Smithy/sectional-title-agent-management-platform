@@ -5,14 +5,20 @@ The path table maps 1:1 to the eventual API Gateway routes (SOLUTION_DESIGN §5)
 
 from __future__ import annotations
 
+import uuid
 from datetime import date
+from pathlib import PurePosixPath
 from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Request
+from pydantic import BaseModel
 
+from app.adapters.s3_documents import extract_text
 from app.api.deps import LLMDep, RepoDep, SettingsDep, get_current_user
 from app.domain import drafting, intake, rag
 from app.domain import seed as seed_module
+from app.ports.documents import DocumentStore
+from app.ports.email import EmailSender
 from app.schemas import (
     AnalyzeIn,
     AnalyzeOut,
@@ -47,6 +53,22 @@ def _runtime(request: Request) -> dict[str, bool]:
     return runtime
 
 
+def _email_sender(request: Request) -> EmailSender:
+    sender: EmailSender = request.app.state.email
+    return sender
+
+
+def _document_store(request: Request) -> DocumentStore:
+    """Return the configured S3 document store, or 503 when uploads are off."""
+    store: DocumentStore | None = getattr(request.app.state, "documents", None)
+    if store is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Document upload is not configured (no storage bucket set).",
+        )
+    return store
+
+
 # ── Health ───────────────────────────────────────────────────────────────────
 @public_router.get("/health", response_model=Health)
 def health(request: Request, settings: SettingsDep) -> Health:
@@ -65,7 +87,9 @@ def health(request: Request, settings: SettingsDep) -> Health:
 
 # ── Seed ─────────────────────────────────────────────────────────────────────
 @router.post("/seed")
-def seed(repo: RepoDep, llm: LLMDep) -> dict[str, int]:
+def seed(repo: RepoDep, llm: LLMDep, settings: SettingsDep) -> dict[str, int]:
+    if not settings.seed_enabled:
+        raise HTTPException(status_code=403, detail="Demo seeding is disabled.")
     return seed_module.seed(repo, llm)
 
 
@@ -118,6 +142,72 @@ def analyze_document(payload: AnalyzeIn, repo: RepoDep, llm: LLMDep) -> AnalyzeO
     )
 
 
+# ── Document upload (presigned S3 PUT → confirm → register + index) ──────────
+# NOTE: the camelCase field names below are the EXACT wire contract the frontend
+# depends on (filename/contentType in, documentId/key/uploadUrl out). pep8-naming
+# (N) is not in the selected ruff rule-set, so they need no per-line ignores.
+class UploadUrlIn(BaseModel):
+    """Request a presigned URL to upload a file directly to S3."""
+
+    filename: str
+    contentType: str = "application/octet-stream"
+
+
+class UploadUrlOut(BaseModel):
+    """A presigned PUT the client uploads the raw file bytes to."""
+
+    documentId: str
+    key: str
+    uploadUrl: str
+
+
+def _safe_filename(filename: str) -> str:
+    """Reduce a client-supplied name to a safe S3 object basename."""
+    base = PurePosixPath(filename.replace("\\", "/")).name.strip()
+    return base or "upload.bin"
+
+
+@router.post("/documents/upload-url", response_model=UploadUrlOut)
+def create_upload_url(
+    payload: UploadUrlIn, request: Request, settings: SettingsDep
+) -> UploadUrlOut:
+    store = _document_store(request)
+    filename = _safe_filename(payload.filename)
+    document_id = uuid.uuid4().hex
+    key = f"uploads/{document_id}/{filename}"
+    upload_url = store.presign_put(
+        key=key,
+        content_type=payload.contentType or "application/octet-stream",
+        expires_in=settings.upload_url_expiry_seconds,
+    )
+    return UploadUrlOut(documentId=document_id, key=key, uploadUrl=upload_url)
+
+
+@router.post("/documents/{document_id}/confirm", response_model=Document)
+def confirm_upload(document_id: str, request: Request, repo: RepoDep) -> Document:
+    """Read the uploaded object back from S3, extract text, and register +
+    index it exactly like the paste-text path."""
+    store = _document_store(request)
+    keys = store.list_keys(prefix=f"uploads/{document_id}/")
+    if not keys:
+        raise HTTPException(status_code=404, detail="No uploaded file found for this document.")
+    key = keys[0]
+    data = store.get_object(key=key)
+    filename = PurePosixPath(key).name
+    content = extract_text(filename, data)
+    title = PurePosixPath(filename).stem or filename
+    if repo.get_document_by_title(title) is not None:
+        repo.delete_document_by_title(title)
+    chunks = rag.chunk_document(title, content)
+    return repo.add_document(
+        title=title,
+        content=content,
+        category="general",
+        effective_date=date.today().isoformat(),
+        chunks=chunks,
+    )
+
+
 # ── Ask (document brain) ─────────────────────────────────────────────────────
 @router.post("/ask", response_model=AskOut)
 def ask(payload: AskIn, repo: RepoDep, llm: LLMDep) -> AskOut:
@@ -133,11 +223,17 @@ def ask(payload: AskIn, repo: RepoDep, llm: LLMDep) -> AskOut:
 
 # ── Inbox (inbound email → draft or task) ────────────────────────────────────
 @router.post("/inbox", response_model=InboxOut)
-def inbox(payload: EmailIn, repo: RepoDep, llm: LLMDep, settings: SettingsDep) -> InboxOut:
+def inbox(
+    payload: EmailIn,
+    repo: RepoDep,
+    llm: LLMDep,
+    settings: SettingsDep,
+    request: Request,
+) -> InboxOut:
     if intake.is_task_email(payload.sender, payload.subject, settings.chairman_emails):
         ticket = drafting.create_task_from_email(repo, payload)
         return InboxOut(kind="task", ticket=ticket)
-    draft = drafting.process_inbound(repo, llm, payload)
+    draft = drafting.process_inbound(repo, llm, payload, email_sender=_email_sender(request))
     return InboxOut(kind="draft", draft=draft)
 
 
@@ -167,11 +263,12 @@ def edit_draft(draft_id: int, payload: DraftEdit, repo: RepoDep) -> Draft:
 def approve_draft(
     draft_id: int,
     repo: RepoDep,
+    request: Request,
     payload: Annotated[DraftEdit | None, Body()] = None,
 ) -> Draft:
     body = payload.body if payload is not None else None
     try:
-        return drafting.approve_draft(repo, draft_id, body)
+        return drafting.approve_draft(repo, draft_id, body, email_sender=_email_sender(request))
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="Draft not found.") from exc
     except drafting.GuardrailBlocked as exc:

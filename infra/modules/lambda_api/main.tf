@@ -41,6 +41,31 @@ variable "bedrock_inference_region" {
   default     = "eu-west-1"
 }
 
+variable "email_identity_arn" {
+  type        = string
+  description = "ARN of the SES identity the function may send from. Empty = no SES policy attached (zero standing perms)."
+  default     = ""
+}
+
+variable "documents_bucket_arn" {
+  type        = string
+  description = "ARN of the document-uploads S3 bucket. Empty = no S3 policy attached (zero standing perms)."
+  default     = ""
+}
+
+# Plan-time toggles: count/for_each cannot depend on values that are unknown
+# until apply (the bucket/identity ARNs are computed during create), so the
+# IAM policies gate on these booleans instead of on the ARN strings.
+variable "email_enabled" {
+  type    = bool
+  default = false
+}
+
+variable "documents_enabled" {
+  type    = bool
+  default = false
+}
+
 variable "memory_mb" {
   type        = number
   description = "Lambda memory (MB)."
@@ -110,6 +135,7 @@ data "aws_iam_policy_document" "dynamo" {
       "dynamodb:UpdateItem",
       "dynamodb:DeleteItem",
       "dynamodb:Query",
+      "dynamodb:Scan",
       "dynamodb:BatchGetItem",
       "dynamodb:BatchWriteItem",
     ]
@@ -144,6 +170,23 @@ data "aws_iam_policy_document" "bedrock" {
       "arn:aws:bedrock:eu-*::foundation-model/anthropic.claude-*",
     ]
   }
+
+  # Anthropic Claude models on Bedrock are offered through AWS Marketplace.
+  # Bedrock validates/completes the account's Marketplace subscription using the
+  # CALLER's identity on invoke, so the execution role must be allowed these two
+  # actions or Converse fails with AccessDeniedException ("required AWS
+  # Marketplace actions ... to enable access to this model"). These actions do
+  # not support resource-level scoping, hence Resource "*". Read-only view +
+  # subscribe-only; still gated behind bedrock_enabled (no standing perms).
+  statement {
+    sid    = "BedrockModelMarketplaceSubscription"
+    effect = "Allow"
+    actions = [
+      "aws-marketplace:ViewSubscriptions",
+      "aws-marketplace:Subscribe",
+    ]
+    resources = ["*"]
+  }
 }
 
 resource "aws_iam_role_policy" "bedrock" {
@@ -151,6 +194,56 @@ resource "aws_iam_role_policy" "bedrock" {
   name   = "${var.name_prefix}-bedrock"
   role   = aws_iam_role.exec.id
   policy = data.aws_iam_policy_document.bedrock[0].json
+}
+
+# Outbound email via SES — only when an identity ARN is supplied (zero standing
+# perms otherwise). Scoped to the single verified from-identity; never "*".
+data "aws_iam_policy_document" "ses" {
+  count = var.email_enabled ? 1 : 0
+
+  statement {
+    sid    = "SendTrusteeReplies"
+    effect = "Allow"
+    actions = [
+      "ses:SendEmail",
+      "ses:SendRawEmail",
+    ]
+    resources = [var.email_identity_arn]
+  }
+}
+
+resource "aws_iam_role_policy" "ses" {
+  count  = var.email_enabled ? 1 : 0
+  name   = "${var.name_prefix}-ses"
+  role   = aws_iam_role.exec.id
+  policy = data.aws_iam_policy_document.ses[0].json
+}
+
+# Document uploads via S3 — only when a bucket ARN is supplied. Object-level
+# read/write on the uploads bucket only (presigned PUT + server-side GET/list).
+data "aws_iam_policy_document" "documents" {
+  count = var.documents_enabled ? 1 : 0
+
+  statement {
+    sid    = "ReadWriteUploads"
+    effect = "Allow"
+    actions = [
+      "s3:PutObject",
+      "s3:GetObject",
+      "s3:ListBucket",
+    ]
+    resources = [
+      var.documents_bucket_arn,
+      "${var.documents_bucket_arn}/*",
+    ]
+  }
+}
+
+resource "aws_iam_role_policy" "documents" {
+  count  = var.documents_enabled ? 1 : 0
+  name   = "${var.name_prefix}-documents"
+  role   = aws_iam_role.exec.id
+  policy = data.aws_iam_policy_document.documents[0].json
 }
 
 # ── Log group (explicit, so retention caps storage cost) ─────────────────────
