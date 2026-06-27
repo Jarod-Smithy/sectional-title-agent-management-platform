@@ -41,6 +41,18 @@ variable "bedrock_inference_region" {
   default     = "eu-west-1"
 }
 
+variable "email_identity_arn" {
+  type        = string
+  description = "ARN of the SES identity the function may send from. Empty = no SES policy attached (zero standing perms)."
+  default     = ""
+}
+
+variable "documents_bucket_arn" {
+  type        = string
+  description = "ARN of the document-uploads S3 bucket. Empty = no S3 policy attached (zero standing perms)."
+  default     = ""
+}
+
 variable "memory_mb" {
   type        = number
   description = "Lambda memory (MB)."
@@ -169,6 +181,56 @@ resource "aws_iam_role_policy" "bedrock" {
   name   = "${var.name_prefix}-bedrock"
   role   = aws_iam_role.exec.id
   policy = data.aws_iam_policy_document.bedrock[0].json
+}
+
+# Outbound email via SES — only when an identity ARN is supplied (zero standing
+# perms otherwise). Scoped to the single verified from-identity; never "*".
+data "aws_iam_policy_document" "ses" {
+  count = var.email_identity_arn != "" ? 1 : 0
+
+  statement {
+    sid    = "SendTrusteeReplies"
+    effect = "Allow"
+    actions = [
+      "ses:SendEmail",
+      "ses:SendRawEmail",
+    ]
+    resources = [var.email_identity_arn]
+  }
+}
+
+resource "aws_iam_role_policy" "ses" {
+  count  = var.email_identity_arn != "" ? 1 : 0
+  name   = "${var.name_prefix}-ses"
+  role   = aws_iam_role.exec.id
+  policy = data.aws_iam_policy_document.ses[0].json
+}
+
+# Document uploads via S3 — only when a bucket ARN is supplied. Object-level
+# read/write on the uploads bucket only (presigned PUT + server-side GET/list).
+data "aws_iam_policy_document" "documents" {
+  count = var.documents_bucket_arn != "" ? 1 : 0
+
+  statement {
+    sid    = "ReadWriteUploads"
+    effect = "Allow"
+    actions = [
+      "s3:PutObject",
+      "s3:GetObject",
+      "s3:ListBucket",
+    ]
+    resources = [
+      var.documents_bucket_arn,
+      "${var.documents_bucket_arn}/*",
+    ]
+  }
+}
+
+resource "aws_iam_role_policy" "documents" {
+  count  = var.documents_bucket_arn != "" ? 1 : 0
+  name   = "${var.name_prefix}-documents"
+  role   = aws_iam_role.exec.id
+  policy = data.aws_iam_policy_document.documents[0].json
 }
 
 # ── Log group (explicit, so retention caps storage cost) ─────────────────────

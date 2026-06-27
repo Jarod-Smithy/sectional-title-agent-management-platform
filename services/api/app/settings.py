@@ -18,6 +18,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 Provider = Literal["stub", "anthropic", "bedrock"]
 RepoBackend = Literal["sqlite", "dynamodb"]
+EmailProvider = Literal["log", "ses"]
 
 _SERVICE_DIR = Path(__file__).resolve().parent.parent
 
@@ -57,6 +58,32 @@ class Settings(BaseSettings):
     data_dir: Path = _SERVICE_DIR / "data"
     sqlite_filename: str = "app.db"
     dynamo_table: str = "stak-platform"
+
+    # ── Demo seeding ─────────────────────────────────────────────────────────
+    # The sample "Acacia Heights" scheme is injected at cold-start (when the
+    # store is empty) and via POST /api/seed. Off by default so real
+    # deployments never auto-populate fake data; the dev live stack opts in
+    # (STAK_SEED_ENABLED=true) to keep the demo dashboard populated.
+    seed_enabled: bool = False
+
+    # ── Outbound email (SES) ─────────────────────────────────────────────────
+    # ``log`` (default) is a dev-safe no-op that only records the interaction;
+    # ``ses`` actually sends approved/auto-filed replies via Amazon SES from
+    # ``email_from`` in ``email_region``. SES sending IS available in
+    # af-south-1. The from-identity must be verified out-of-band (manual DKIM /
+    # email verification — see infra/modules/ses) before ``ses`` will deliver.
+    email_provider: EmailProvider = "log"
+    email_from: str = ""
+    email_region: str = "af-south-1"
+
+    # ── Document uploads (S3) ────────────────────────────────────────────────
+    # When ``documents_bucket`` is empty (default) the S3 upload endpoints are
+    # disabled (503) and only the paste-text path is available — dev-safe with
+    # zero standing storage. Set the bucket (live stack) to enable presigned
+    # uploads; ``upload_url_expiry_seconds`` bounds the presigned PUT lifetime.
+    documents_bucket: str = ""
+    documents_region: str = "af-south-1"
+    upload_url_expiry_seconds: int = 900
 
     # ── LLM provider ─────────────────────────────────────────────────────────
     llm_provider: Provider = "stub"
@@ -146,6 +173,16 @@ class Settings(BaseSettings):
     def bedrock_resolved_region(self) -> str:
         """Region the Bedrock client targets (falls back to ``aws_region``)."""
         return self.bedrock_inference_region or self.aws_region
+
+    @property
+    def email_resolved_region(self) -> str:
+        """Region the SES client targets (falls back to ``aws_region``)."""
+        return self.email_region or self.aws_region
+
+    @property
+    def documents_resolved_region(self) -> str:
+        """Region the S3 documents client targets (falls back to ``aws_region``)."""
+        return self.documents_region or self.aws_region
 
     def bedrock_model_id(self, tier: str | None = None) -> str:
         """Bedrock model id for ``tier`` with the cross-region inference-profile

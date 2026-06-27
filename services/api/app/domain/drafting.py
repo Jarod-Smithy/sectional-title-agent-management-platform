@@ -1,10 +1,11 @@
 """Draft Composer + correspondence flow — orchestration over the ports.
 
 Ties together intake → RAG → LLM draft → Governance Guardian, persisting an
-inbound interaction and a pending draft. On approval it FILES an outbound
-interaction (it does not email) and raises a trustee ticket. Bare
-acknowledgements are auto-filed (no ticket) — the one configured exception to
-human-in-the-loop.
+inbound interaction and a pending draft. On approval it records an outbound
+interaction (the system of record) and — when an email provider is configured —
+delivers the approved reply to the original sender via the ``EmailSender`` seam,
+then raises a trustee ticket. Bare acknowledgements are auto-filed/sent (no
+ticket) — the one configured exception to human-in-the-loop.
 
 Every function takes the ``Repository`` and ``LLM`` ports explicitly, so this
 module has no global state and is wired by the API layer.
@@ -12,10 +13,15 @@ module has no global state and is wired by the API layer.
 
 from __future__ import annotations
 
+import logging
+
 from app.domain import guardrails, intake, rag, threads
+from app.ports.email import EmailError, EmailSender
 from app.ports.llm import LLM
 from app.ports.repository import Repository
 from app.schemas import Draft, EmailIn, Source, Ticket
+
+logger = logging.getLogger("stak.drafting")
 
 _AUTO_SEND_INTENTS = {"acknowledgement"}
 
@@ -24,7 +30,18 @@ class GuardrailBlocked(Exception):
     """Raised when an approve is attempted on a draft with BLOCK findings."""
 
 
-def process_inbound(repo: Repository, llm: LLM, email: EmailIn) -> Draft:
+def _looks_like_email(value: str) -> bool:
+    candidate = value.strip()
+    return "@" in candidate and "." in candidate.split("@", 1)[-1] and " " not in candidate
+
+
+def process_inbound(
+    repo: Repository,
+    llm: LLM,
+    email: EmailIn,
+    *,
+    email_sender: EmailSender | None = None,
+) -> Draft:
     party = intake.extract_party(email.sender)
     intent = intake.classify_intent(email.subject, email.body)
     # The matter's "about" unit comes from the subject/body; the sender's own
@@ -76,7 +93,14 @@ def process_inbound(repo: Repository, llm: LLM, email: EmailIn) -> Draft:
 
     # 5. Auto-file a clean bare acknowledgement (the one configured exception).
     if auto_send:
-        _file_reply(repo, draft_id, create_ticket=False, status="auto_filed")
+        _file_reply(
+            repo,
+            draft_id,
+            create_ticket=False,
+            status="auto_filed",
+            email_sender=email_sender,
+            reply_to=email.sender,
+        )
 
     result = repo.get_draft(draft_id)
     if result is None:
@@ -102,10 +126,17 @@ def discard_draft(repo: Repository, draft_id: int) -> Draft | None:
     return repo.get_draft(draft_id)
 
 
-def approve_draft(repo: Repository, draft_id: int, body: str | None = None) -> Draft:
+def approve_draft(
+    repo: Repository,
+    draft_id: int,
+    body: str | None = None,
+    *,
+    email_sender: EmailSender | None = None,
+) -> Draft:
     """Approve = file the (possibly edited) reply + raise a ticket. Re-screens
     the exact text being approved server-side, so an in-place edit can never
-    bypass the Governance Guardian."""
+    bypass the Governance Guardian. When an email provider is configured, the
+    approved reply is also delivered to the original sender."""
     draft = repo.get_draft(draft_id)
     if draft is None:
         raise KeyError(draft_id)
@@ -119,16 +150,54 @@ def approve_draft(repo: Repository, draft_id: int, body: str | None = None) -> D
             "This reply proposes an action that needs a signed resolution (or hits "
             "an absolute no-go). Edit the wording before filing."
         )
-    _file_reply(repo, draft_id, create_ticket=True, status="filed")
+    _file_reply(repo, draft_id, create_ticket=True, status="filed", email_sender=email_sender)
     result = repo.get_draft(draft_id)
     if result is None:
         raise RuntimeError(f"draft {draft_id} missing immediately after filing")
     return result
 
 
-def _file_reply(repo: Repository, draft_id: int, *, create_ticket: bool, status: str) -> None:
-    """File the outbound interaction and optionally raise a ticket. This FILES a
-    record — it does not send an email."""
+def _send_reply_email(
+    email_sender: EmailSender | None, draft: Draft, *, reply_to: str | None
+) -> None:
+    """Best-effort delivery of an approved/auto-filed reply.
+
+    The interaction ledger is the system of record; delivery is a side effect.
+    A missing sender, an unresolvable recipient, or a provider error is logged
+    and swallowed so approval/auto-filing never fails on an email hiccup. The
+    recipient is the explicit ``reply_to`` (the inbound sender, for auto-sends)
+    or the party when it is itself an email address."""
+    if email_sender is None:
+        return
+    recipient = ""
+    if reply_to and _looks_like_email(reply_to):
+        recipient = reply_to.strip()
+    elif _looks_like_email(draft.party):
+        recipient = draft.party.strip()
+    if not recipient:
+        logger.info("email.skip draft=%s — no resolvable recipient; recorded only", draft.id)
+        return
+    subject = f"RE: {draft.inbound_subject or draft.case_ref}"
+    try:
+        message_id = email_sender.send(to=recipient, subject=subject, body=draft.body)
+    except EmailError as exc:
+        logger.warning("email.fail draft=%s to=%s: %s (recorded only)", draft.id, recipient, exc)
+        return
+    logger.info("email.sent draft=%s to=%s message_id=%s", draft.id, recipient, message_id)
+
+
+def _file_reply(
+    repo: Repository,
+    draft_id: int,
+    *,
+    create_ticket: bool,
+    status: str,
+    email_sender: EmailSender | None = None,
+    reply_to: str | None = None,
+) -> None:
+    """Record the outbound interaction, deliver it (when a provider is
+    configured), and optionally raise a ticket. The interaction is ALWAYS
+    recorded — delivery is a best-effort side effect."""
     draft = repo.get_draft(draft_id)
     if draft is None:
         raise KeyError(draft_id)
@@ -140,6 +209,7 @@ def _file_reply(repo: Repository, draft_id: int, *, create_ticket: bool, status:
         unit=draft.unit,
         case_ref=draft.case_ref,
     )
+    _send_reply_email(email_sender, draft, reply_to=reply_to)
     if create_ticket:
         title = f"{draft.intent.title()} — {draft.party}" + (
             f" ({draft.unit})" if draft.unit else ""

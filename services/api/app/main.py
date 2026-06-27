@@ -17,7 +17,13 @@ from mangum import Mangum
 
 from app import __version__
 from app.api.routes import public_router, router
-from app.bootstrap import build_llm, build_repo, build_verifier
+from app.bootstrap import (
+    build_document_store,
+    build_email_sender,
+    build_llm,
+    build_repo,
+    build_verifier,
+)
 from app.domain import seed as seed_module
 from app.settings import get_settings
 
@@ -30,12 +36,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.repo = repo
     app.state.llm = llm
     app.state.verifier = build_verifier(settings)
+    app.state.email = build_email_sender(settings)
+    app.state.documents = build_document_store(settings)
     app.state.runtime = {
         "assist_enabled": settings.assist_enabled,
         "kill_switch": settings.assist_kill_switch,
     }
-    # First-run convenience: seed the sample scheme if the store is empty.
-    if repo.count_documents() == 0:
+    # First-run convenience: seed the sample scheme if the store is empty — but
+    # only when explicitly enabled (the dev live stack opts in). Real
+    # deployments never auto-populate the anonymised demo data.
+    if settings.seed_enabled and repo.count_documents() == 0:
         seed_module.seed(repo, llm)
     yield
 
