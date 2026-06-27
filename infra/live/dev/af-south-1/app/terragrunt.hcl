@@ -31,8 +31,24 @@ inputs = {
   # De-prototype edges (Increment 8):
   # - seed_enabled=true keeps the demo "Acacia Heights" dashboard populated in dev.
   # - documents_enabled=true provisions the private uploads bucket + presigned PUT/GET.
-  # - email stays in "log" mode (email_enabled=false) until an SES from-identity is
-  #   verified out-of-band; flip email_enabled=true + set email_from after verifying.
+  # - email_enabled=true registers the SES from-identity below and attaches the scoped
+  #   ses:SendEmail IAM. NOTE: a @gmail.com from-address won't pass DMARC for real
+  #   delivery (no domain control); fine for SES sandbox testing to verified recipients.
+  #   Replace with a domain-based identity (DKIM) for production.
   seed_enabled      = true
   documents_enabled = true
+  email_enabled     = true
+  email_from        = "agent.kiepersol@gmail.com"
+
+  # AI-native SDLC (Increment 9): captured errors + approved feature requests
+  # become labelled GitHub issues that the SDLC agent picks up.
+  # - sdlc_enabled=true reads the GitHub PAT from Secrets Manager (stak/sdlc/github-pat
+  #   in eu-west-1) at boot and attaches scoped secretsmanager:GetSecretValue IAM.
+  # - approver_email gets the feature-request approval magic-links (over SES).
+  # - public_base_url is the API origin the approval links point back to (set
+  #   explicitly to avoid a Lambda↔API Gateway dependency cycle).
+  sdlc_enabled    = true
+  github_repo     = "Jarod-Smithy/sectional-title-agent-management-platform"
+  approver_email  = "jarod.mark.smith@gmail.com"
+  public_base_url = "https://f29y0n9h2d.execute-api.af-south-1.amazonaws.com"
 }
