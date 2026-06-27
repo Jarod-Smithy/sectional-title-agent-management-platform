@@ -92,7 +92,7 @@ def test_extract_text_pdf_without_pypdf_yields_notice(monkeypatch: pytest.Monkey
     def fake_import(name: str, *args: Any, **kwargs: Any) -> Any:
         if name == "pypdf":
             raise ImportError("pypdf not installed")
-        return real_import(name, *args, **kwargs)
+        return real_import(name, *args, **kwargs)  # pragma: no cover
 
     monkeypatch.setattr(importlib, "import_module", fake_import)
     out = extract_text("scan.pdf", b"%PDF-1.4 ...")
@@ -117,7 +117,7 @@ def test_extract_text_pdf_with_pypdf_extracts_pages(monkeypatch: pytest.MonkeyPa
     def fake_import(name: str, *args: Any, **kwargs: Any) -> Any:
         if name == "pypdf":
             return fake_module
-        return real_import(name, *args, **kwargs)
+        return real_import(name, *args, **kwargs)  # pragma: no cover
 
     monkeypatch.setattr(importlib, "import_module", fake_import)
     # Magic-byte detection (no .pdf extension) still routes through the PDF path.
@@ -136,7 +136,7 @@ def test_extract_text_pdf_malformed_yields_notice(monkeypatch: pytest.MonkeyPatc
     def fake_import(name: str, *args: Any, **kwargs: Any) -> Any:
         if name == "pypdf":
             return fake_module
-        return real_import(name, *args, **kwargs)
+        return real_import(name, *args, **kwargs)  # pragma: no cover
 
     monkeypatch.setattr(importlib, "import_module", fake_import)
     out = extract_text("scan.pdf", b"%PDF-broken")
