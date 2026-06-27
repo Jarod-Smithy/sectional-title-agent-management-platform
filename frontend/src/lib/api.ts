@@ -13,6 +13,8 @@ import type {
   Draft,
   DraftEdit,
   EmailIn,
+  FeatureRequestAck,
+  FeatureRequestIn,
   Health,
   InboxOut,
   IssueCreatedOut,
@@ -214,6 +216,14 @@ export class ApiClient {
   // ── SDLC: file a captured error as a bug issue ────────────────────────────
   reportBug(payload: BugReportIn): Promise<IssueCreatedOut> {
     return this.request<IssueCreatedOut>("/api/report-bug", {
+      method: "POST",
+      body: payload,
+    });
+  }
+
+  // ── SDLC: submit a feature request for emailed approval ───────────────────
+  requestFeature(payload: FeatureRequestIn): Promise<FeatureRequestAck> {
+    return this.request<FeatureRequestAck>("/api/feature-request", {
       method: "POST",
       body: payload,
     });

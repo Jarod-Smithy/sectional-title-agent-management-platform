@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-from app.domain.sdlc import format_bug_report
+from app.domain.sdlc import (
+    approval_email,
+    format_bug_report,
+    format_feature_request,
+)
 
 
 def test_format_includes_all_sections_when_present() -> None:
@@ -46,3 +50,30 @@ def test_long_message_is_clipped_in_title_and_body() -> None:
     assert title.endswith("…")
     # The body field is clipped to its own (larger) limit and also ellipsised.
     assert "…" in body
+
+
+def test_feature_request_uses_details_for_body() -> None:
+    title, body = format_feature_request(
+        title="Dark mode toggle",
+        details="Add a theme switch in the header.",
+        requester="trustee.chair",
+    )
+    assert title == "[feature] Dark mode toggle"
+    assert "trustee.chair" in body
+    assert "Add a theme switch" in body
+
+
+def test_feature_request_falls_back_to_title_when_no_details() -> None:
+    title, body = format_feature_request(title="Export CSV", details="", requester="")
+    assert title == "[feature] Export CSV"
+    assert "unknown" in body
+    assert "Export CSV" in body
+
+
+def test_approval_email_embeds_the_link() -> None:
+    subject, body = approval_email(
+        title="Dark mode", requester="trustee", link="https://api/approve?token=abc"
+    )
+    assert "Dark mode" in subject
+    assert "https://api/approve?token=abc" in body
+    assert "trustee" in body

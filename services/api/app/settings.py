@@ -96,6 +96,16 @@ class Settings(BaseSettings):
     github_secret_name: str = "stak/sdlc/github-pat"
     sdlc_region: str = "eu-west-1"
 
+    # ── Feature-request approval (signed magic-links over SES) ────────────────
+    # A feature request emails an HMAC-signed approval link to ``approver_email``;
+    # opening it files an ``ai-sdlc``/``feature`` issue. All three must be set for
+    # the endpoint to accept requests (else 503). ``approval_secret`` signs the
+    # token; ``public_base_url`` is the API origin the link points back to.
+    approver_email: str = ""
+    approval_secret: str = ""
+    public_base_url: str = ""
+    feature_request_ttl_seconds: int = 86400
+
     # ── LLM provider ─────────────────────────────────────────────────────────
     llm_provider: Provider = "stub"
     anthropic_api_key: str = ""

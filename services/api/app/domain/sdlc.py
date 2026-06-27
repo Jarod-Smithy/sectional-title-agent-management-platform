@@ -50,3 +50,39 @@ def format_bug_report(
     if stack.strip():
         lines += ["", "### Stack trace", "```", _clip(stack, _MAX_FIELD), "```"]
     return title, "\n".join(lines)
+
+
+def format_feature_request(*, title: str, details: str, requester: str) -> tuple[str, str]:
+    """Return ``(title, body)`` for an approved feature request."""
+    summary = _clip(title, _MAX_TITLE - len("[feature] ")) or "Feature request"
+    issue_title = f"[feature] {summary}"
+    body = "\n".join(
+        [
+            "_Approved via the dashboard feature-request flow._",
+            "",
+            f"**Requested by:** {_clip(requester, 200) or 'unknown'}",
+            "",
+            "### Request",
+            _clip(details, _MAX_FIELD) or _clip(title, _MAX_FIELD),
+        ]
+    )
+    return issue_title, body
+
+
+def approval_email(*, title: str, requester: str, link: str) -> tuple[str, str]:
+    """Return ``(subject, body)`` for the approver's magic-link email."""
+    subject = f"Approve feature request: {_clip(title, 80)}"
+    body = "\n".join(
+        [
+            f"{_clip(requester, 200) or 'A trustee'} requested a new feature:",
+            "",
+            f"  {_clip(title, 200)}",
+            "",
+            "Approve it (this files a tracked issue) by opening:",
+            link,
+            "",
+            "If you don't recognise this request, ignore this email — nothing",
+            "happens until the link is opened.",
+        ]
+    )
+    return subject, body
