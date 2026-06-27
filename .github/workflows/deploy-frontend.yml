@@ -1,0 +1,78 @@
+# Deploy the Next.js dashboard (static export) to S3 + CloudFront via GitHub
+# OIDC (no stored cloud keys).
+#
+# Prerequisites (one-time, see infra/live/dev/af-south-1/):
+#   1. `cd infra/live/dev/af-south-1/bootstrap && terragrunt apply` (deploy role,
+#      now incl. site-bucket sync + CloudFront invalidation perms)
+#      then `cd ../site && terragrunt apply` (S3 origin + CloudFront).
+#   2. Set these GitHub Actions repository VARIABLES:
+#        AWS_DEPLOY_ROLE_ARN              (bootstrap: deploy_role_arn — already set)
+#        AWS_REGION                       (af-south-1 — already set)
+#        SITE_BUCKET_NAME                 (site: bucket_name, e.g. stak-dev-site)
+#        SITE_CLOUDFRONT_ID               (site: cloudfront_distribution_id)
+#        NEXT_PUBLIC_API_BASE             (app: api_endpoint, no trailing slash)
+#        NEXT_PUBLIC_COGNITO_REGION       (af-south-1)
+#        NEXT_PUBLIC_COGNITO_USER_POOL_ID (app: cognito_user_pool_id)
+#        NEXT_PUBLIC_COGNITO_CLIENT_ID    (app: cognito_client_id)
+#
+# This workflow only UPLOADS the built static assets + invalidates the cache. It
+# never creates/destroys infrastructure (that stays in Terraform/Terragrunt).
+
+name: Deploy (Frontend)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "frontend/**"
+      - ".github/workflows/deploy-frontend.yml"
+  workflow_dispatch:
+
+permissions:
+  id-token: write # required for OIDC
+  contents: read
+
+concurrency:
+  group: deploy-frontend-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build + deploy frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies (workspaces)
+        run: npm ci
+
+      - name: Build static export
+        # NEXT_PUBLIC_* are build-time inlined into the bundle (public config, not
+        # secrets). Output lands in frontend/out (output: "export").
+        env:
+          NEXT_PUBLIC_API_BASE: ${{ vars.NEXT_PUBLIC_API_BASE }}
+          NEXT_PUBLIC_COGNITO_REGION: ${{ vars.NEXT_PUBLIC_COGNITO_REGION }}
+          NEXT_PUBLIC_COGNITO_USER_POOL_ID: ${{ vars.NEXT_PUBLIC_COGNITO_USER_POOL_ID }}
+          NEXT_PUBLIC_COGNITO_CLIENT_ID: ${{ vars.NEXT_PUBLIC_COGNITO_CLIENT_ID }}
+        run: npm run build --workspace frontend
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Sync to S3
+        run: |
+          aws s3 sync frontend/out "s3://${{ vars.SITE_BUCKET_NAME }}" --delete
+
+      - name: Invalidate CloudFront cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id "${{ vars.SITE_CLOUDFRONT_ID }}" \
+            --paths "/*"

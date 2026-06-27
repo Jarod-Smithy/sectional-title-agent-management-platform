@@ -64,6 +64,11 @@ locals {
 
   function_arn_prefix = "arn:aws:lambda:${var.aws_region}:${var.account_id}:function:${var.name_prefix}-*"
   layer_arn_prefix    = "arn:aws:lambda:${var.aws_region}:${var.account_id}:layer:${var.name_prefix}-*"
+
+  # Frontend static-site bucket (created by the separate `site` stack). Derived
+  # from name_prefix the same way the lambda/layer ARNs are, so this bootstrap
+  # stack stays dependency-free and can still be applied first.
+  site_bucket_arn = "arn:aws:s3:::${var.name_prefix}-site"
 }
 
 data "aws_iam_policy_document" "deploy_trust" {
@@ -125,6 +130,37 @@ data "aws_iam_policy_document" "deploy_perms" {
     effect    = "Allow"
     actions   = ["lambda:GetLayerVersion"]
     resources = ["${local.layer_arn_prefix}:*"]
+  }
+
+  # ── Frontend static-site deploy (S3 sync + CloudFront invalidation) ──────────
+  # The deploy-frontend workflow syncs the exported Next.js build (frontend/out)
+  # to the site bucket and invalidates the edge cache. Scoped to THIS project's
+  # site bucket only. CloudFront invalidation can't be ARN-scoped at bootstrap
+  # time (the distribution is created later by the `site` stack), so those two
+  # actions use Resource "*" — invalidation is cache-only/non-destructive, so the
+  # blast radius is negligible. No standing cost ($0).
+  statement {
+    sid    = "SyncSiteBucket"
+    effect = "Allow"
+    actions = [
+      "s3:PutObject",
+      "s3:DeleteObject",
+      "s3:ListBucket",
+    ]
+    resources = [
+      local.site_bucket_arn,
+      "${local.site_bucket_arn}/*",
+    ]
+  }
+
+  statement {
+    sid    = "InvalidateCloudFront"
+    effect = "Allow"
+    actions = [
+      "cloudfront:CreateInvalidation",
+      "cloudfront:GetInvalidation",
+    ]
+    resources = ["*"]
   }
 }
 
