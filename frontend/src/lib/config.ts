@@ -26,4 +26,10 @@ export const config = {
       "local-client-id",
     ),
   },
+  features: {
+    // Demo-only "Simulate an inbound email" control. Defaults OFF so it never
+    // ships in production builds; set NEXT_PUBLIC_ENABLE_SIMULATED_INTAKE=true
+    // for local/demo environments. The /api/inbox endpoint itself is unaffected.
+    simulatedIntake: process.env.NEXT_PUBLIC_ENABLE_SIMULATED_INTAKE === "true",
+  },
 } as const;
