@@ -20,6 +20,7 @@ from app.api.routes import public_router, router
 from app.bootstrap import (
     build_document_store,
     build_email_sender,
+    build_issue_tracker,
     build_llm,
     build_repo,
     build_verifier,
@@ -38,6 +39,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.verifier = build_verifier(settings)
     app.state.email = build_email_sender(settings)
     app.state.documents = build_document_store(settings)
+    app.state.issue_tracker = build_issue_tracker(settings)
     app.state.runtime = {
         "assist_enabled": settings.assist_enabled,
         "kill_switch": settings.assist_kill_switch,

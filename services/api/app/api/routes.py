@@ -16,15 +16,18 @@ from pydantic import BaseModel
 from app.adapters.s3_documents import extract_text
 from app.api.deps import LLMDep, RepoDep, SettingsDep, get_current_user
 from app.domain import drafting, intake, rag
+from app.domain import sdlc as sdlc_domain
 from app.domain import seed as seed_module
 from app.ports.documents import DocumentStore
 from app.ports.email import EmailSender
+from app.ports.sdlc import IssueTracker, IssueTrackerError
 from app.schemas import (
     AnalyzeIn,
     AnalyzeOut,
     AskIn,
     AskOut,
     AssistConfig,
+    BugReportIn,
     Document,
     DocumentIn,
     Draft,
@@ -32,6 +35,7 @@ from app.schemas import (
     EmailIn,
     Health,
     InboxOut,
+    IssueCreatedOut,
     Resolution,
     Source,
     Ticket,
@@ -67,6 +71,11 @@ def _document_store(request: Request) -> DocumentStore:
             detail="Document upload is not configured (no storage bucket set).",
         )
     return store
+
+
+def _issue_tracker(request: Request) -> IssueTracker:
+    tracker: IssueTracker = request.app.state.issue_tracker
+    return tracker
 
 
 # ── Health ───────────────────────────────────────────────────────────────────
@@ -319,6 +328,31 @@ def set_ticket_status(ticket_id: int, payload: TicketStatusIn, repo: RepoDep) ->
 @router.get("/resolutions", response_model=list[Resolution])
 def list_resolutions(repo: RepoDep) -> list[Resolution]:
     return repo.list_resolutions()
+
+
+# ── SDLC: capture a runtime error → labelled bug issue ───────────────────────
+@router.post("/report-bug", response_model=IssueCreatedOut)
+def report_bug(payload: BugReportIn, request: Request) -> IssueCreatedOut:
+    """File a captured client-side error as an ``ai-sdlc``/``bug`` issue.
+
+    With the SDLC pipeline disabled (default) the offline tracker records the
+    report and returns ``created=false`` (HTTP 200) — the dashboard treats both
+    paths as success so error capture never surfaces a second error.
+    """
+    title, body = sdlc_domain.format_bug_report(
+        message=payload.message,
+        stack=payload.stack,
+        url=payload.url,
+        user_agent=payload.user_agent,
+        context=payload.context,
+    )
+    try:
+        ref = _issue_tracker(request).create_issue(
+            title=title, body=body, labels=("ai-sdlc", "bug")
+        )
+    except IssueTrackerError as exc:
+        raise HTTPException(status_code=502, detail="Could not file the bug report.") from exc
+    return IssueCreatedOut(number=ref.number, url=ref.url, created=ref.number > 0)
 
 
 # ── Assist config (global toggle + kill-switch) ──────────────────────────────

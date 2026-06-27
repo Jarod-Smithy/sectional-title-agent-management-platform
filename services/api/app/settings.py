@@ -85,6 +85,17 @@ class Settings(BaseSettings):
     documents_region: str = "af-south-1"
     upload_url_expiry_seconds: int = 900
 
+    # ── AI-native SDLC (GitHub issues) ───────────────────────────────────────
+    # When ``sdlc_enabled`` is false (default) the issue-tracker seam is the
+    # offline ``LogIssueTracker`` (records, never calls GitHub) — dev-safe with
+    # zero standing perms. Enable it (live stack) to file labelled issues from
+    # captured errors / feature requests. The PAT is read at boot from Secrets
+    # Manager (``github_secret_name`` in ``sdlc_region``); never an env var.
+    sdlc_enabled: bool = False
+    github_repo: str = ""
+    github_secret_name: str = "stak/sdlc/github-pat"
+    sdlc_region: str = "eu-west-1"
+
     # ── LLM provider ─────────────────────────────────────────────────────────
     llm_provider: Provider = "stub"
     anthropic_api_key: str = ""
@@ -183,6 +194,11 @@ class Settings(BaseSettings):
     def documents_resolved_region(self) -> str:
         """Region the S3 documents client targets (falls back to ``aws_region``)."""
         return self.documents_region or self.aws_region
+
+    @property
+    def sdlc_resolved_region(self) -> str:
+        """Region the SDLC Secrets Manager client targets (falls back to ``aws_region``)."""
+        return self.sdlc_region or self.aws_region
 
     def bedrock_model_id(self, tier: str | None = None) -> str:
         """Bedrock model id for ``tier`` with the cross-region inference-profile

@@ -172,5 +172,20 @@ class AssistConfig(BaseModel):
     available: bool
 
 
+# ── AI-native SDLC ───────────────────────────────────────────────────────────
+class BugReportIn(BaseModel):
+    message: str = Field(min_length=1, max_length=4000)
+    stack: str = Field(default="", max_length=8000)
+    url: str = Field(default="", max_length=1000)
+    user_agent: str = Field(default="", max_length=1000)
+    context: str = Field(default="", max_length=4000)
+
+
+class IssueCreatedOut(BaseModel):
+    number: int
+    url: str
+    created: bool
+
+
 # Resolve forward references now that Draft and Ticket are defined.
 InboxOut.model_rebuild()

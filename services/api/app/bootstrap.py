@@ -12,6 +12,7 @@ from app.ports.documents import DocumentStore
 from app.ports.email import EmailSender
 from app.ports.llm import LLM
 from app.ports.repository import Repository
+from app.ports.sdlc import IssueTracker
 from app.security import CognitoVerifier
 from app.settings import Settings
 
@@ -92,3 +93,23 @@ def build_document_store(settings: Settings) -> DocumentStore | None:
 
     client = boto3.client("s3", region_name=settings.documents_resolved_region)
     return S3DocumentStore(client=client, bucket=settings.documents_bucket)
+
+
+def build_issue_tracker(settings: Settings) -> IssueTracker:
+    """Select the SDLC issue-tracker adapter from settings.
+
+    Default ``log`` is an offline no-op (dev/CI safe). When ``sdlc_enabled`` is
+    set, the GitHub PAT is read from Secrets Manager (never an env var) and a
+    :class:`app.adapters.github_issues.GitHubIssueTracker` is wired in.
+    """
+    if not settings.sdlc_enabled:
+        from app.adapters.github_issues import LogIssueTracker
+
+        return LogIssueTracker()
+    import boto3
+
+    from app.adapters.github_issues import GitHubIssueTracker, UrllibTransport
+
+    secrets = boto3.client("secretsmanager", region_name=settings.sdlc_resolved_region)
+    token = secrets.get_secret_value(SecretId=settings.github_secret_name)["SecretString"].strip()
+    return GitHubIssueTracker(transport=UrllibTransport(), repo=settings.github_repo, token=token)

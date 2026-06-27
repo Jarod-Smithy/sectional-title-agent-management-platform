@@ -162,3 +162,17 @@ export interface AssistConfig {
   kill_switch: boolean;
   available: boolean;
 }
+
+export interface BugReportIn {
+  message: string;
+  stack?: string;
+  url?: string;
+  user_agent?: string;
+  context?: string;
+}
+
+export interface IssueCreatedOut {
+  number: number;
+  url: string;
+  created: boolean;
+}

@@ -5,6 +5,7 @@ import type {
   AskIn,
   AskOut,
   AssistConfig,
+  BugReportIn,
   Document,
   DocumentIn,
   DocumentUploadUrlIn,
@@ -14,6 +15,7 @@ import type {
   EmailIn,
   Health,
   InboxOut,
+  IssueCreatedOut,
   Resolution,
   Ticket,
   TicketIn,
@@ -207,5 +209,13 @@ export class ApiClient {
   // ── Assist config ─────────────────────────────────────────────────────────
   getAssistConfig(signal?: AbortSignal): Promise<AssistConfig> {
     return this.request<AssistConfig>("/api/assist/config", { signal });
+  }
+
+  // ── SDLC: file a captured error as a bug issue ────────────────────────────
+  reportBug(payload: BugReportIn): Promise<IssueCreatedOut> {
+    return this.request<IssueCreatedOut>("/api/report-bug", {
+      method: "POST",
+      body: payload,
+    });
   }
 }

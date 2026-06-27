@@ -66,6 +66,20 @@ variable "documents_enabled" {
   default = false
 }
 
+# AI-native SDLC: when enabled, the function reads a GitHub PAT from Secrets
+# Manager at boot to file issues. Gated on a plain bool (the secret ARN may be
+# cross-region/unknown-friendly) so no standing perms otherwise.
+variable "sdlc_enabled" {
+  type    = bool
+  default = false
+}
+
+variable "sdlc_secret_arn" {
+  type        = string
+  description = "ARN (wildcard ok) of the GitHub PAT secret the function may read. Empty = no SecretsManager policy."
+  default     = ""
+}
+
 variable "memory_mb" {
   type        = number
   description = "Lambda memory (MB)."
@@ -244,6 +258,26 @@ resource "aws_iam_role_policy" "documents" {
   name   = "${var.name_prefix}-documents"
   role   = aws_iam_role.exec.id
   policy = data.aws_iam_policy_document.documents[0].json
+}
+
+# AI-native SDLC: read the GitHub PAT from Secrets Manager — only when enabled.
+# Scoped to the single secret ARN (wildcard suffix); never "*".
+data "aws_iam_policy_document" "sdlc" {
+  count = var.sdlc_enabled ? 1 : 0
+
+  statement {
+    sid       = "ReadGithubPat"
+    effect    = "Allow"
+    actions   = ["secretsmanager:GetSecretValue"]
+    resources = [var.sdlc_secret_arn]
+  }
+}
+
+resource "aws_iam_role_policy" "sdlc" {
+  count  = var.sdlc_enabled ? 1 : 0
+  name   = "${var.name_prefix}-sdlc"
+  role   = aws_iam_role.exec.id
+  policy = data.aws_iam_policy_document.sdlc[0].json
 }
 
 # ── Log group (explicit, so retention caps storage cost) ─────────────────────

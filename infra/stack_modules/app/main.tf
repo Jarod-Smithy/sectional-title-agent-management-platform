@@ -100,6 +100,32 @@ variable "documents_allowed_origins" {
   default = ["*"]
 }
 
+# AI-native SDLC (GitHub issues). Off by default = provider stays the offline
+# log tracker and NO Secrets Manager IAM is attached. Flip to true (and set
+# github_repo) to file labelled issues from captured errors / feature requests.
+# The PAT lives in Secrets Manager (sdlc_secret_name in sdlc_region) and is read
+# at boot — never an env var.
+variable "sdlc_enabled" {
+  type    = bool
+  default = false
+}
+
+variable "github_repo" {
+  type        = string
+  description = "Target repo for SDLC issues, in 'owner/name' form."
+  default     = ""
+}
+
+variable "sdlc_secret_name" {
+  type    = string
+  default = "stak/sdlc/github-pat"
+}
+
+variable "sdlc_region" {
+  type    = string
+  default = "eu-west-1"
+}
+
 module "tags" {
   source = "../../modules/tags"
 
@@ -159,6 +185,8 @@ module "lambda_api" {
   documents_bucket_arn     = var.documents_enabled ? module.s3_docs[0].bucket_arn : ""
   email_enabled            = var.email_enabled
   documents_enabled        = var.documents_enabled
+  sdlc_enabled             = var.sdlc_enabled
+  sdlc_secret_arn          = var.sdlc_enabled ? "arn:aws:secretsmanager:${var.sdlc_region}:${var.account_id}:secret:${var.sdlc_secret_name}-*" : ""
   tags                     = module.tags.tags
 
   # Cognito auth wiring. The verifier only fetches the pool's public JWKS over
@@ -175,6 +203,10 @@ module "lambda_api" {
     STAK_EMAIL_PROVIDER           = var.email_enabled ? "ses" : "log"
     STAK_EMAIL_FROM               = var.email_from
     STAK_DOCUMENTS_BUCKET         = var.documents_enabled ? module.s3_docs[0].bucket_name : ""
+    STAK_SDLC_ENABLED             = tostring(var.sdlc_enabled)
+    STAK_GITHUB_REPO              = var.github_repo
+    STAK_GITHUB_SECRET_NAME       = var.sdlc_secret_name
+    STAK_SDLC_REGION              = var.sdlc_region
   }
 }
 
