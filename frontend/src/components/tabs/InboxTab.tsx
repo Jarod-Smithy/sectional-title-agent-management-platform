@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { ApiError } from "@/lib/api";
 import { SeverityChip } from "@/components/StatusChip";
+import { config } from "@/lib/config";
 import { useApi } from "@/lib/useApi";
 import type { Draft } from "@/lib/types";
 
@@ -84,43 +85,45 @@ export function InboxTab() {
 
   return (
     <div className="two-col">
-      <section className="panel" aria-labelledby="email-heading">
-        <h2 id="email-heading">Simulate an inbound email</h2>
-        <form onSubmit={onProcess}>
-          <label>
-            From
-            <input
-              value={sender}
-              onChange={(e) => setSender(e.target.value)}
-              required
-            />
-          </label>
-          <label>
-            Subject
-            <input
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              required
-            />
-          </label>
-          <label>
-            Body
-            <textarea
-              rows={5}
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              required
-            />
-          </label>
-          <button className="btn" type="submit" disabled={busy}>
-            {busy ? "Processing…" : "Process → draft reply"}
-          </button>
-        </form>
-        {note && <div className="banner info">{note}</div>}
-        {error && <div className="banner error">{error}</div>}
-      </section>
+      {config.features.simulatedIntake && (
+        <section className="panel" aria-labelledby="email-heading">
+          <h2 id="email-heading">Simulate an inbound email</h2>
+          <form onSubmit={onProcess}>
+            <label>
+              From
+              <input
+                value={sender}
+                onChange={(e) => setSender(e.target.value)}
+                required
+              />
+            </label>
+            <label>
+              Subject
+              <input
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                required
+              />
+            </label>
+            <label>
+              Body
+              <textarea
+                rows={5}
+                value={body}
+                onChange={(e) => setBody(e.target.value)}
+                required
+              />
+            </label>
+            <button className="btn" type="submit" disabled={busy}>
+              {busy ? "Processing…" : "Process → draft reply"}
+            </button>
+          </form>
+          {note && <div className="banner info">{note}</div>}
+        </section>
+      )}
       <section className="panel" aria-labelledby="drafts-heading">
         <h2 id="drafts-heading">Drafts awaiting approval</h2>
+        {error && <div className="banner error">{error}</div>}
         {drafts.length === 0 ? (
           <p className="hint">No pending drafts.</p>
         ) : (
