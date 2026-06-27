@@ -145,6 +145,23 @@ data "aws_iam_policy_document" "bedrock" {
       "arn:aws:bedrock:eu-*::foundation-model/anthropic.claude-*",
     ]
   }
+
+  # Anthropic Claude models on Bedrock are offered through AWS Marketplace.
+  # Bedrock validates/completes the account's Marketplace subscription using the
+  # CALLER's identity on invoke, so the execution role must be allowed these two
+  # actions or Converse fails with AccessDeniedException ("required AWS
+  # Marketplace actions ... to enable access to this model"). These actions do
+  # not support resource-level scoping, hence Resource "*". Read-only view +
+  # subscribe-only; still gated behind bedrock_enabled (no standing perms).
+  statement {
+    sid    = "BedrockModelMarketplaceSubscription"
+    effect = "Allow"
+    actions = [
+      "aws-marketplace:ViewSubscriptions",
+      "aws-marketplace:Subscribe",
+    ]
+    resources = ["*"]
+  }
 }
 
 resource "aws_iam_role_policy" "bedrock" {
