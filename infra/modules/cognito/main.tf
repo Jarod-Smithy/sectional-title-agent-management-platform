@@ -2,6 +2,12 @@
 # Cost: user pools are free for the first 50,000 MAU (basic tier). Advanced
 # security features (the only paid add-on) are intentionally NOT enabled, so
 # this stays at ~$0 and within the zero-spend dev goal / $50 lifetime cap.
+#
+# Future upgrade (NOT in this change, scope discipline): the Cognito
+# "Essentials"/"Plus" feature plans unlock passkeys (WebAuthn), the USER_AUTH
+# choice-based sign-in flow, managed login UI, and threat protection. At our
+# MAU (~low double-digits) these tiers are cost-trivial (pennies/month), but
+# enabling them is a separate decision and deliberately left out here.
 
 variable "name_prefix" {
   type        = string
@@ -36,12 +42,16 @@ resource "aws_cognito_user_pool" "this" {
     temporary_password_validity_days = 7
   }
 
-  # MFA is OFF for the dev pool: SMS MFA incurs per-message cost and TOTP adds
-  # onboarding friction before any real users exist. Revisit in prod-hardening
-  # (POPIA) where MFA for trustees is warranted. Advanced Security ("audit"/
-  # "enforced") is the paid feature and stays disabled.
-  # checkov:skip=CKV_AWS_171:MFA deferred to prod-hardening (zero-spend dev pool)
-  mfa_configuration = "OFF"
+  # TOTP (software-token) MFA is now ON as OPTIONAL. Software tokens are free
+  # (no per-message cost), so this stays within the $50/month budget. SMS MFA is
+  # intentionally NOT enabled because it bills per message. Enforcement can later
+  # move OPTIONAL->ON once all trustees have enrolled an authenticator app.
+  # checkov:skip=CKV_AWS_171:TOTP MFA enabled as OPTIONAL; SMS intentionally off (per-message cost)
+  mfa_configuration = "OPTIONAL"
+
+  software_token_mfa_configuration {
+    enabled = true
+  }
 
   tags = var.tags
 }
@@ -58,13 +68,16 @@ resource "aws_cognito_user_pool_client" "this" {
     "ALLOW_REFRESH_TOKEN_AUTH",
   ]
 
-  access_token_validity  = 1
-  id_token_validity      = 1
+  # Short-lived access token (15 min) shrinks the theft/replay window if a token
+  # leaks; the long-lived refresh token (30d) keeps trustees signed in. Id token
+  # also 15 min to match. Note: access_token uses "minutes" units below.
+  access_token_validity  = 15
+  id_token_validity      = 15
   refresh_token_validity = 30
 
   token_validity_units {
-    access_token  = "hours"
-    id_token      = "hours"
+    access_token  = "minutes"
+    id_token      = "minutes"
     refresh_token = "days"
   }
 
