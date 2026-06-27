@@ -97,12 +97,12 @@ def test_converse_failure_raises_bedrock_error() -> None:
 
 def test_settings_bedrock_model_id_applies_eu_geo_prefix() -> None:
     settings = Settings(bedrock_inference_region="eu-west-1")
-    assert settings.bedrock_model_id("balanced").startswith("eu.anthropic.claude-3-5-sonnet")
+    assert settings.bedrock_model_id("balanced").startswith("eu.anthropic.claude-sonnet-4-6")
 
 
 def test_settings_bedrock_model_id_no_prefix_outside_geo() -> None:
     settings = Settings(bedrock_inference_region="", aws_region="af-south-1")
-    assert settings.bedrock_model_id("fast") == "anthropic.claude-3-haiku-20240307-v1:0"
+    assert settings.bedrock_model_id("fast") == "anthropic.claude-haiku-4-5-20251001-v1:0"
 
 
 def test_build_llm_returns_bedrock_adapter_when_provider_is_bedrock() -> None:

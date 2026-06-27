@@ -116,22 +116,29 @@ class Settings(BaseSettings):
 
     @property
     def model_tiers(self) -> dict[str, ModelTier]:
-        """Bedrock model tiers (cost-aware) — fast/balanced/deep."""
+        """Bedrock model tiers (cost-aware) — fast/balanced/deep.
+
+        IDs are the base model names; ``bedrock_model_id`` prepends the
+        cross-region inference-profile geo prefix (e.g. ``eu.``). Verified
+        available as eu-west-1 inference profiles for this account on
+        2026-06-27. ``fast`` (Haiku 4.5) additionally requires the one-time
+        Anthropic use-case form to be submitted for the account.
+        """
         return {
             "fast": ModelTier(
-                label="Claude 3 Haiku",
-                bedrock_id="anthropic.claude-3-haiku-20240307-v1:0",
+                label="Claude Haiku 4.5",
+                bedrock_id="anthropic.claude-haiku-4-5-20251001-v1:0",
                 cost_per_run=0.01,
             ),
             "balanced": ModelTier(
-                label="Claude 3.5 Sonnet",
-                bedrock_id="anthropic.claude-3-5-sonnet-20241022-v2:0",
-                cost_per_run=0.08,
+                label="Claude Sonnet 4.6",
+                bedrock_id="anthropic.claude-sonnet-4-6",
+                cost_per_run=0.06,
             ),
             "deep": ModelTier(
-                label="Claude 3 Opus",
-                bedrock_id="anthropic.claude-3-opus-20240229-v1:0",
-                cost_per_run=0.33,
+                label="Claude Opus 4.6",
+                bedrock_id="anthropic.claude-opus-4-6-v1",
+                cost_per_run=0.30,
             ),
         }
 
