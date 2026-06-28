@@ -1,25 +1,33 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ApiError } from "@/lib/api";
+import { RetryableError, SkeletonList } from "@/components/LoadState";
 import { useApi } from "@/lib/useApi";
 import { useNotify } from "@/components/Notifications";
 import { reportAndNotify } from "@/lib/errorReporting";
 import type { Resolution } from "@/lib/types";
 
-export function ResolutionsTab() {
+export function ResolutionsTab({
+  onNavigate,
+}: {
+  /** Routes the empty-state CTA to a more useful tab (injected by AppShell). */
+  onNavigate?: (tab: "documents") => void;
+}) {
   const api = useApi();
   const notify = useNotify();
   const [resolutions, setResolutions] = useState<Resolution[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [loadState, setLoadState] = useState<"loading" | "ready">("loading");
 
-  useEffect(() => {
-    const ctrl = new AbortController();
-    api
-      .listResolutions(ctrl.signal)
-      .then(setResolutions)
-      .catch((err: unknown) => {
-        if (!ctrl.signal.aborted) {
+  const load = useCallback(
+    async (signal?: AbortSignal) => {
+      try {
+        const data = await api.listResolutions(signal);
+        setResolutions(data);
+        setError(null);
+      } catch (err) {
+        if (!signal?.aborted) {
           setError(
             err instanceof ApiError
               ? err.detail
@@ -32,9 +40,28 @@ export function ResolutionsTab() {
             notify,
           });
         }
-      });
+      } finally {
+        if (!signal?.aborted) setLoadState("ready");
+      }
+    },
+    [api, notify],
+  );
+
+  useEffect(() => {
+    const ctrl = new AbortController();
+    // load() only calls setState after an awaited fetch (no synchronous setState
+    // in the effect body), so this on-mount load is intentional.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void load(ctrl.signal);
     return () => ctrl.abort();
-  }, [api, notify]);
+  }, [load]);
+
+  /** "Try again" on a failed load: re-show the skeleton, then re-fetch. */
+  function retryLoad() {
+    setError(null);
+    setLoadState("loading");
+    void load();
+  }
 
   return (
     <section className="panel" aria-labelledby="res-heading">
@@ -43,9 +70,23 @@ export function ResolutionsTab() {
         Signed resolutions are the scheme&rsquo;s source of truth for what the
         trustees may act on.
       </p>
-      {error && <div className="banner error">{error}</div>}
-      {resolutions.length === 0 && !error ? (
-        <p className="hint">No resolutions on record.</p>
+      {loadState === "loading" ? (
+        <SkeletonList />
+      ) : error ? (
+        <RetryableError message={error} onRetry={retryLoad} />
+      ) : resolutions.length === 0 ? (
+        <div className="empty-state">
+          <p className="hint">No resolutions on record.</p>
+          {onNavigate && (
+            <button
+              className="btn"
+              type="button"
+              onClick={() => onNavigate("documents")}
+            >
+              Add your documents
+            </button>
+          )}
+        </div>
       ) : (
         resolutions.map((r) => (
           <div key={r.id} className="list-row">

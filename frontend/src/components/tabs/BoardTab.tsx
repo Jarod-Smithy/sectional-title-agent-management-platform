@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError } from "@/lib/api";
 import { StatusChip } from "@/components/StatusChip";
+import { RetryableError, SkeletonCards } from "@/components/LoadState";
 import { useApi } from "@/lib/useApi";
 import { useNotify } from "@/components/Notifications";
 import { reportAndNotify } from "@/lib/errorReporting";
@@ -19,6 +20,20 @@ const NEXT: Partial<Record<TicketStatus, TicketStatus>> = {
   in_progress: "done",
 };
 
+const TYPE_OPTIONS = [
+  "general",
+  "maintenance",
+  "financial",
+  "complaint",
+  "governance",
+  "compliance",
+];
+
+/** Title-cases a lowercase API enum value for display (the value stays lower). */
+function titleCase(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
 export function BoardTab() {
   const api = useApi();
   const notify = useNotify();
@@ -27,15 +42,21 @@ export function BoardTab() {
   const [type, setType] = useState("general");
   const [priority, setPriority] = useState("normal");
   const [error, setError] = useState<string | null>(null);
+  // Loading -> (empty | data) for the board (separate from add/advance errors).
+  const [listError, setListError] = useState<string | null>(null);
+  const [loadState, setLoadState] = useState<"loading" | "ready">("loading");
   const [busy, setBusy] = useState(false);
+  const titleRef = useRef<HTMLInputElement>(null);
 
   const refresh = useCallback(
     async (signal?: AbortSignal) => {
       try {
-        setTickets(await api.listTickets(signal));
+        const data = await api.listTickets(signal);
+        setTickets(data);
+        setListError(null);
       } catch (err) {
         if (!signal?.aborted) {
-          setError(
+          setListError(
             err instanceof ApiError ? err.detail : "Failed to load tasks.",
           );
           void reportAndNotify({
@@ -45,6 +66,8 @@ export function BoardTab() {
             notify,
           });
         }
+      } finally {
+        if (!signal?.aborted) setLoadState("ready");
       }
     },
     [api, notify],
@@ -52,9 +75,19 @@ export function BoardTab() {
 
   useEffect(() => {
     const ctrl = new AbortController();
+    // refresh() only calls setState after an awaited fetch (no synchronous
+    // setState in the effect body), so this on-mount load is intentional.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void refresh(ctrl.signal);
     return () => ctrl.abort();
   }, [refresh]);
+
+  /** "Try again" on a failed load: re-show the skeleton, then re-fetch. */
+  function retryLoad() {
+    setListError(null);
+    setLoadState("loading");
+    void refresh();
+  }
 
   async function onAdd(e: React.FormEvent) {
     e.preventDefault();
@@ -99,6 +132,7 @@ export function BoardTab() {
           <label>
             Title
             <input
+              ref={titleRef}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Describe the task to be done…"
@@ -108,16 +142,9 @@ export function BoardTab() {
           <label>
             Type
             <select value={type} onChange={(e) => setType(e.target.value)}>
-              {[
-                "general",
-                "maintenance",
-                "financial",
-                "complaint",
-                "governance",
-                "compliance",
-              ].map((t) => (
+              {TYPE_OPTIONS.map((t) => (
                 <option key={t} value={t}>
-                  {t}
+                  {titleCase(t)}
                 </option>
               ))}
             </select>
@@ -128,8 +155,8 @@ export function BoardTab() {
               value={priority}
               onChange={(e) => setPriority(e.target.value)}
             >
-              <option value="normal">normal</option>
-              <option value="high">high</option>
+              <option value="normal">Normal</option>
+              <option value="high">High</option>
             </select>
           </label>
           <button className="btn" type="submit" disabled={busy}>
@@ -140,36 +167,53 @@ export function BoardTab() {
       </section>
       <section className="panel" aria-labelledby="board-heading">
         <h2 id="board-heading">Trustee Task Board</h2>
-        <div className="board">
-          {COLUMNS.map((col) => (
-            <div key={col} className="col" data-status={col}>
-              <h3>{COLUMN_LABEL[col]}</h3>
-              {tickets
-                .filter((t) => t.status === col)
-                .map((t) => (
-                  <div key={t.id} className="card">
-                    <h4>{t.title}</h4>
-                    <div className="meta">
-                      {t.type} · {t.priority}
-                      {t.unit ? ` · ${t.unit}` : ""}
+        {loadState === "loading" ? (
+          <SkeletonCards />
+        ) : listError ? (
+          <RetryableError message={listError} onRetry={retryLoad} />
+        ) : tickets.length === 0 ? (
+          <div className="empty-state">
+            <p className="hint">No tasks yet.</p>
+            <button
+              className="btn"
+              type="button"
+              onClick={() => titleRef.current?.focus()}
+            >
+              Add your first task
+            </button>
+          </div>
+        ) : (
+          <div className="board">
+            {COLUMNS.map((col) => (
+              <div key={col} className="col" data-status={col}>
+                <h3>{COLUMN_LABEL[col]}</h3>
+                {tickets
+                  .filter((t) => t.status === col)
+                  .map((t) => (
+                    <div key={t.id} className="card">
+                      <h4>{t.title}</h4>
+                      <div className="meta">
+                        {t.type} · {t.priority}
+                        {t.unit ? ` · ${t.unit}` : ""}
+                      </div>
+                      <div className="card-actions">
+                        <StatusChip status={t.status} />
+                        {NEXT[t.status] && (
+                          <button
+                            className="btn ghost"
+                            onClick={() => advance(t)}
+                            type="button"
+                          >
+                            Move &rarr;
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    <div className="card-actions">
-                      <StatusChip status={t.status} />
-                      {NEXT[t.status] && (
-                        <button
-                          className="btn ghost"
-                          onClick={() => advance(t)}
-                          type="button"
-                        >
-                          Move &rarr;
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-            </div>
-          ))}
-        </div>
+                  ))}
+              </div>
+            ))}
+          </div>
+        )}
       </section>
     </div>
   );

@@ -19,16 +19,30 @@ export function resetReportedSignatures(): void {
 }
 
 /**
- * Decide whether a caught error is worth filing as a bug. Only *unexpected*
- * failures qualify: transport/runtime errors (a thrown `Error` with no HTTP
- * status — e.g. a network/CORS failure) and server faults (HTTP 5xx). Expected
- * client outcomes — auth (401/403), not-found (404), validation/conflict (4xx)
- * — are surfaced inline by the caller and must NOT spam the issue tracker or
- * wake the SDLC agent for non-bugs.
+ * A *connectivity* condition rather than a bug: the request never reached a
+ * working server. For this persona (trustees on slow/intermittent mobile) a
+ * brief WiFi drop is the COMMON case, so these must NOT be filed as bugs or
+ * shown the alarming "engineers notified" toast. {@link api.ts} normalises both
+ * fetch transport failures and request timeouts to an `ApiError` with
+ * `status === 0`, so a single check covers offline, dropped TCP, CORS and
+ * timeout.
+ */
+export function isConnectivityError(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 0;
+}
+
+/**
+ * Decide whether a caught error is worth filing as a bug. Only genuine *server
+ * faults* (HTTP 5xx) and unexpected runtime errors (a thrown non-`ApiError`,
+ * e.g. a real coding fault) qualify. Expected client outcomes — auth (401/403),
+ * not-found (404), validation/conflict (4xx) — are surfaced inline by the
+ * caller, and *connectivity* conditions (`status === 0`: offline/timeout) are a
+ * calm, recoverable everyday event — neither must spam the issue tracker or
+ * wake the SDLC agent.
  */
 export function isReportableError(error: unknown): boolean {
   if (error instanceof ApiError) {
-    return error.status >= 500 || error.status === 0;
+    return error.status >= 500;
   }
   return true;
 }

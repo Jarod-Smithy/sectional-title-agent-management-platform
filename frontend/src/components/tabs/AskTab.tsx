@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { ApiError } from "@/lib/api";
 import { useApi } from "@/lib/useApi";
 import { useNotify } from "@/components/Notifications";
@@ -15,24 +15,45 @@ export function AskTab() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const askQuestion = useCallback(
+    async (q: string) => {
+      if (!q.trim()) return;
+      setLoading(true);
+      setError(null);
+      try {
+        setResult(await api.ask({ question: q }));
+      } catch (err) {
+        setError(
+          err instanceof ApiError ? err.detail : "Something went wrong.",
+        );
+        void reportAndNotify({
+          error: err,
+          context: "ask.submit",
+          api,
+          notify,
+        });
+      } finally {
+        setLoading(false);
+      }
+    },
+    [api, notify],
+  );
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!question.trim()) return;
-    setLoading(true);
-    setError(null);
-    try {
-      setResult(await api.ask({ question }));
-    } catch (err) {
-      setError(err instanceof ApiError ? err.detail : "Something went wrong.");
-      void reportAndNotify({ error: err, context: "ask.submit", api, notify });
-    } finally {
-      setLoading(false);
-    }
+    await askQuestion(question);
+  }
+
+  /** Empty-state CTA: pre-fill a plain example and ask it straight away. */
+  function askExample() {
+    const example = "What are the rules about my levies?";
+    setQuestion(example);
+    void askQuestion(example);
   }
 
   return (
     <section className="panel" aria-labelledby="ask-heading">
-      <h2 id="ask-heading">Ask the scheme&rsquo;s records</h2>
+      <h2 id="ask-heading">Ask a question</h2>
       <form onSubmit={onSubmit}>
         <label>
           Your question
@@ -51,6 +72,14 @@ export function AskTab() {
         Answers are guidance drawn from your documents, not formal legal advice.
       </p>
       {error && <div className="banner error">{error}</div>}
+      {!result && !loading && !error && (
+        <div className="empty-state">
+          <p className="hint">Not sure where to start?</p>
+          <button className="btn ghost" type="button" onClick={askExample}>
+            Ask a question about your levies
+          </button>
+        </div>
+      )}
       {result && (
         <div>
           <p style={{ whiteSpace: "pre-wrap" }}>{result.answer}</p>

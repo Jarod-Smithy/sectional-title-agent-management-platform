@@ -3,13 +3,19 @@
 import { useCallback, useEffect, useState } from "react";
 import { ApiError } from "@/lib/api";
 import { SeverityChip } from "@/components/StatusChip";
+import { RetryableError, SkeletonList } from "@/components/LoadState";
 import { config } from "@/lib/config";
 import { useApi } from "@/lib/useApi";
 import { useNotify } from "@/components/Notifications";
 import { reportAndNotify } from "@/lib/errorReporting";
 import type { Draft } from "@/lib/types";
 
-export function InboxTab() {
+export function InboxTab({
+  onNavigate,
+}: {
+  /** Routes the empty-state CTA to a more useful tab (injected by AppShell). */
+  onNavigate?: (tab: "documents") => void;
+}) {
   const api = useApi();
   const notify = useNotify();
   const [sender, setSender] = useState("owner.surname@gmail.com");
@@ -17,16 +23,21 @@ export function InboxTab() {
   const [body, setBody] = useState("");
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [error, setError] = useState<string | null>(null);
+  // Loading -> (empty | data) for the drafts list (separate from action errors).
+  const [listError, setListError] = useState<string | null>(null);
+  const [loadState, setLoadState] = useState<"loading" | "ready">("loading");
   const [note, setNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const refresh = useCallback(
     async (signal?: AbortSignal) => {
       try {
-        setDrafts(await api.listDrafts("pending", signal));
+        const data = await api.listDrafts("pending", signal);
+        setDrafts(data);
+        setListError(null);
       } catch (err) {
         if (!signal?.aborted) {
-          setError(
+          setListError(
             err instanceof ApiError ? err.detail : "Failed to load drafts.",
           );
           void reportAndNotify({
@@ -36,6 +47,8 @@ export function InboxTab() {
             notify,
           });
         }
+      } finally {
+        if (!signal?.aborted) setLoadState("ready");
       }
     },
     [api, notify],
@@ -43,9 +56,19 @@ export function InboxTab() {
 
   useEffect(() => {
     const ctrl = new AbortController();
+    // refresh() only calls setState after an awaited fetch (no synchronous
+    // setState in the effect body), so this on-mount load is intentional.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void refresh(ctrl.signal);
     return () => ctrl.abort();
   }, [refresh]);
+
+  /** "Try again" on a failed load: re-show the skeleton, then re-fetch. */
+  function retryLoad() {
+    setListError(null);
+    setLoadState("loading");
+    void refresh();
+  }
 
   async function onProcess(e: React.FormEvent) {
     e.preventDefault();
@@ -151,8 +174,23 @@ export function InboxTab() {
       <section className="panel" aria-labelledby="drafts-heading">
         <h2 id="drafts-heading">Drafts awaiting approval</h2>
         {error && <div className="banner error">{error}</div>}
-        {drafts.length === 0 ? (
-          <p className="hint">No pending drafts.</p>
+        {loadState === "loading" ? (
+          <SkeletonList />
+        ) : listError ? (
+          <RetryableError message={listError} onRetry={retryLoad} />
+        ) : drafts.length === 0 ? (
+          <div className="empty-state">
+            <p className="hint">No pending drafts.</p>
+            {onNavigate && (
+              <button
+                className="btn"
+                type="button"
+                onClick={() => onNavigate("documents")}
+              >
+                Add your documents
+              </button>
+            )}
+          </div>
         ) : (
           drafts.map((d) => (
             <div key={d.id} className="list-row">

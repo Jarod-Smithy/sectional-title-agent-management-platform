@@ -12,8 +12,12 @@ describe("StatusChip", () => {
     expect(screen.getByText("Done")).toBeInTheDocument();
   });
 
-  it("renders a severity chip", () => {
-    render(<SeverityChip severity="block" />);
-    expect(screen.getByText("block")).toBeInTheDocument();
+  it("renders a plain-English severity label for each guardrail finding", () => {
+    const { rerender } = render(<SeverityChip severity="block" />);
+    expect(screen.getByText("Must fix")).toBeInTheDocument();
+    rerender(<SeverityChip severity="warn" />);
+    expect(screen.getByText("Check")).toBeInTheDocument();
+    rerender(<SeverityChip severity="info" />);
+    expect(screen.getByText("Note")).toBeInTheDocument();
   });
 });

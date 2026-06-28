@@ -37,10 +37,30 @@ export class ApiError extends Error {
 /** Resolves the bearer token for the current session, or null when signed out. */
 export type TokenProvider = () => string | null;
 
+/** Default read timeout — generous for the persona's slow/intermittent mobile. */
+const DEFAULT_READ_TIMEOUT_MS = 20_000;
+/** Uploads stream the whole file, so they get a much longer ceiling. */
+const DEFAULT_UPLOAD_TIMEOUT_MS = 60_000;
+
+/** Calm, persona-appropriate copy for a dropped/offline connection. */
+export const OFFLINE_DETAIL =
+  "You appear to be offline — check your connection and try again.";
+/** Copy when the request was sent but the server didn't answer in time. */
+export const TIMEOUT_DETAIL =
+  "This is taking longer than expected — check your connection and try again.";
+
+/** Overridable timeouts; injected mainly so tests can drive short deadlines. */
+export interface ApiClientOptions {
+  readTimeoutMs?: number;
+  uploadTimeoutMs?: number;
+}
+
 interface RequestOptions {
   method?: string;
   body?: unknown;
   signal?: AbortSignal;
+  /** Per-call override of the read timeout (ms). */
+  timeoutMs?: number;
 }
 
 /**
@@ -52,7 +72,55 @@ export class ApiClient {
   constructor(
     private readonly getToken: TokenProvider = () => null,
     private readonly baseUrl: string = config.apiBase,
+    private readonly options: ApiClientOptions = {},
   ) {}
+
+  /**
+   * `fetch` wrapped in an {@link AbortController} deadline. Transport failures —
+   * a dropped/offline connection (fetch throws) or the timeout firing — are
+   * normalised to an {@link ApiError} with `status === 0` so callers and
+   * `errorReporting` can treat them as a *connectivity* condition (a brief WiFi
+   * drop is the common case for this persona) rather than a filable bug. Genuine
+   * user cancellation (the caller's own `signal` aborting on unmount) is
+   * re-thrown untouched so the caller can ignore it via `signal.aborted`.
+   */
+  private async fetchWithTimeout(
+    url: string,
+    init: RequestInit,
+    timeoutMs: number,
+    userSignal?: AbortSignal,
+  ): Promise<Response> {
+    // The deadline is enforced with a `Promise.race` against a timer rather than
+    // by attaching a freshly-created `AbortController.signal` to `fetch`. The
+    // race is realm-agnostic and works on every mobile browser this persona
+    // uses; attaching an internally-created signal would trip a jsdom/undici
+    // "instanceof AbortSignal" mismatch under test. The caller's own
+    // `userSignal` (genuine unmount cancellation) is still forwarded to `fetch`,
+    // so real cancellation keeps working in the browser.
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_resolve, reject) => {
+      timer = setTimeout(
+        () => reject(new ApiError(0, TIMEOUT_DETAIL)),
+        timeoutMs,
+      );
+    });
+    try {
+      const fetchInit: RequestInit = userSignal
+        ? { ...init, signal: userSignal }
+        : init;
+      return await Promise.race([fetch(url, fetchInit), timeout]);
+    } catch (err) {
+      // The timer won the race: surface the timeout copy.
+      if (err instanceof ApiError) throw err;
+      // Genuine user cancellation (component unmount): re-throw untouched so the
+      // caller can ignore it via its own `signal.aborted` check.
+      if (userSignal?.aborted) throw err;
+      // fetch threw for a transport reason (offline, DNS, CORS, dropped TCP).
+      throw new ApiError(0, OFFLINE_DETAIL);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
 
   private async request<T>(
     path: string,
@@ -63,12 +131,16 @@ export class ApiClient {
     if (token) headers.Authorization = `Bearer ${token}`;
     if (opts.body !== undefined) headers["Content-Type"] = "application/json";
 
-    const res = await fetch(`${this.baseUrl}${path}`, {
-      method: opts.method ?? "GET",
-      headers,
-      body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
-      signal: opts.signal,
-    });
+    const res = await this.fetchWithTimeout(
+      `${this.baseUrl}${path}`,
+      {
+        method: opts.method ?? "GET",
+        headers,
+        body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+      },
+      opts.timeoutMs ?? this.options.readTimeoutMs ?? DEFAULT_READ_TIMEOUT_MS,
+      opts.signal,
+    );
 
     if (!res.ok) {
       let detail = res.statusText;
@@ -126,11 +198,15 @@ export class ApiClient {
    * must match what was signed in step 1.
    */
   async uploadFileToS3(uploadUrl: string, file: File): Promise<void> {
-    const res = await fetch(uploadUrl, {
-      method: "PUT",
-      headers: { "Content-Type": file.type || "application/octet-stream" },
-      body: file,
-    });
+    const res = await this.fetchWithTimeout(
+      uploadUrl,
+      {
+        method: "PUT",
+        headers: { "Content-Type": file.type || "application/octet-stream" },
+        body: file,
+      },
+      this.options.uploadTimeoutMs ?? DEFAULT_UPLOAD_TIMEOUT_MS,
+    );
     if (!res.ok) {
       throw new ApiError(
         res.status,

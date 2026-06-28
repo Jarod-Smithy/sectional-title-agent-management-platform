@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   FALLBACK_COPY,
   NOTIFIED_COPY,
+  isConnectivityError,
   isReportableError,
   reportAndNotify,
   resetReportedSignatures,
@@ -146,6 +147,43 @@ describe("reportAndNotify", () => {
     expect(api.reportBug).not.toHaveBeenCalled();
     expect(notify).not.toHaveBeenCalled();
   });
+
+  it("does NOT file or notify for a connectivity condition (status 0)", async () => {
+    const api = makeApi({
+      number: 11,
+      url: "https://github.com/acme/repo/issues/11",
+      created: true,
+    });
+    const notify = vi.fn();
+
+    // A dropped/offline connection or timeout (api.ts normalises both to
+    // ApiError status 0) is the COMMON case for this persona — surfaced inline
+    // by the caller, never filed as a bug nor shown the alarming toast.
+    await reportAndNotify({
+      error: new ApiError(
+        0,
+        "You appear to be offline — check your connection.",
+      ),
+      context: "ctx.offline",
+      api,
+      notify,
+    });
+
+    expect(api.reportBug).not.toHaveBeenCalled();
+    expect(notify).not.toHaveBeenCalled();
+  });
+});
+
+describe("isConnectivityError", () => {
+  it("is true for transport/timeout failures (ApiError status 0)", () => {
+    expect(isConnectivityError(new ApiError(0, "offline"))).toBe(true);
+  });
+
+  it("is false for HTTP responses and generic errors", () => {
+    expect(isConnectivityError(new ApiError(500, "Internal"))).toBe(false);
+    expect(isConnectivityError(new ApiError(404, "Not Found"))).toBe(false);
+    expect(isConnectivityError(new Error("boom"))).toBe(false);
+  });
 });
 
 describe("isReportableError", () => {
@@ -154,9 +192,13 @@ describe("isReportableError", () => {
     expect(isReportableError("boom")).toBe(true);
   });
 
-  it("reports server faults (5xx) and unknown-status transport ApiErrors", () => {
+  it("reports genuine server faults (5xx)", () => {
     expect(isReportableError(new ApiError(500, "Internal"))).toBe(true);
-    expect(isReportableError(new ApiError(0, "Network"))).toBe(true);
+    expect(isReportableError(new ApiError(503, "Unavailable"))).toBe(true);
+  });
+
+  it("does NOT report connectivity conditions (status 0: offline/timeout)", () => {
+    expect(isReportableError(new ApiError(0, "Network"))).toBe(false);
   });
 
   it("ignores expected client errors (4xx)", () => {
