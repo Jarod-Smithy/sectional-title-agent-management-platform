@@ -101,7 +101,7 @@ export function BoardTab() {
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. Obtain 3 quotes for gate motor"
+              placeholder="Describe the task to be done…"
               required
             />
           </label>

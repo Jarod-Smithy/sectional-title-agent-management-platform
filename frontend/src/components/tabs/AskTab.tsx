@@ -39,7 +39,7 @@ export function AskTab() {
           <input
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
-            placeholder="e.g. What are the quiet hours? Can we charge interest on arrears?"
+            placeholder="Ask about the scheme's rules, finances, levies or governance…"
             required
           />
         </label>

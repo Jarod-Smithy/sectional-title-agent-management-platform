@@ -19,16 +19,23 @@ import hashlib
 import hmac
 import json
 import os
+import time
 import uuid
 from typing import Any
 
 import boto3
 from botocore.config import Config
+from botocore.exceptions import BotoCoreError, ClientError
 
 HARNESS_ARN = os.environ["HARNESS_ARN"]
 WEBHOOK_SECRET_NAME = os.environ["WEBHOOK_SECRET_NAME"]
 SELF_FUNCTION_NAME = os.environ["SELF_FUNCTION_NAME"]
 TRIGGER_LABEL = os.environ.get("TRIGGER_LABEL", "ai-sdlc")
+# Bedrock can throttle the harness's ConverseStream under load (e.g. when GitHub
+# fires opened+labeled and two runs race). Retry the whole run a few times with
+# exponential backoff so a transient ThrottlingException doesn't drop the issue.
+_MAX_ATTEMPTS = 3
+_BACKOFF_BASE_SECONDS = 20
 
 _secrets = boto3.client("secretsmanager")
 _lambda = boto3.client("lambda")
@@ -88,20 +95,38 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     return _ack(202, f"dispatched issue #{issue.get('number')} to the SDLC agent")
 
 
+def _is_throttle(text: str | None) -> bool:
+    low = (text or "").lower()
+    return "throttl" in low or "too many requests" in low or "max retries" in low
+
+
 def _run_agent(issue: dict[str, Any]) -> dict[str, Any]:
     message = (
         f"GitHub issue #{issue['number']} (labels: {', '.join(issue['labels'])}).\n"
         f"Title: {issue['title']}\n\n{issue['body']}"
     )
-    response = _agent.invoke_harness(
-        harnessArn=HARNESS_ARN,
-        runtimeSessionId=f"ai-sdlc-issue-{issue['number']}-{uuid.uuid4().hex}",
-        messages=[{"role": "user", "content": [{"text": message}]}],
-    )
-    stop_reason = "unknown"
-    for chunk in response["stream"]:
-        if "messageStop" in chunk:
-            stop_reason = chunk["messageStop"].get("stopReason", stop_reason)
-        elif "runtimeClientError" in chunk:
-            return {"ok": False, "error": chunk["runtimeClientError"].get("message")}
-    return {"ok": True, "issue": issue["number"], "stopReason": stop_reason}
+    last_error = "unknown error"
+    for attempt in range(_MAX_ATTEMPTS):
+        try:
+            response = _agent.invoke_harness(
+                harnessArn=HARNESS_ARN,
+                runtimeSessionId=f"ai-sdlc-issue-{issue['number']}-{uuid.uuid4().hex}",
+                messages=[{"role": "user", "content": [{"text": message}]}],
+            )
+            stop_reason = "unknown"
+            for chunk in response["stream"]:
+                if "messageStop" in chunk:
+                    stop_reason = chunk["messageStop"].get("stopReason", stop_reason)
+                elif "runtimeClientError" in chunk:
+                    last_error = chunk["runtimeClientError"].get("message", "runtime error")
+                    if _is_throttle(last_error) and attempt + 1 < _MAX_ATTEMPTS:
+                        break  # fall through to backoff + retry
+                    return {"ok": False, "issue": issue["number"], "error": last_error}
+            else:
+                return {"ok": True, "issue": issue["number"], "stopReason": stop_reason}
+        except (ClientError, BotoCoreError) as exc:
+            last_error = str(exc)
+            if not (_is_throttle(last_error) and attempt + 1 < _MAX_ATTEMPTS):
+                return {"ok": False, "issue": issue["number"], "error": last_error}
+        time.sleep(_BACKOFF_BASE_SECONDS * (2**attempt))
+    return {"ok": False, "issue": issue["number"], "error": last_error}
