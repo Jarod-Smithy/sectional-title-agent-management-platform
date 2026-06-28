@@ -18,6 +18,14 @@ const SEVERITY_FILL: Record<Severity, string> = {
   info: "var(--status-info)",
 };
 
+/** Plain-English labels for guardrail severities (the raw codes mean nothing
+ * to a trustee). */
+const SEVERITY_LABEL: Record<Severity, string> = {
+  block: "Must fix",
+  warn: "Check",
+  info: "Note",
+};
+
 /** A monday-style coloured status chip for ticket board states. */
 export function StatusChip({ status }: { status: TicketStatus }) {
   return (
@@ -43,7 +51,7 @@ export function SeverityChip({ severity }: { severity: Severity }) {
         color: severity === "block" ? "#ffffff" : "#171a22",
       }}
     >
-      {severity}
+      {SEVERITY_LABEL[severity]}
     </span>
   );
 }

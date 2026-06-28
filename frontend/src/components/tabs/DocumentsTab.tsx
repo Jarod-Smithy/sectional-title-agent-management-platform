@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError } from "@/lib/api";
 import { useApi } from "@/lib/useApi";
 import { useNotify } from "@/components/Notifications";
+import { RetryableError, SkeletonList } from "@/components/LoadState";
 import { reportAndNotify } from "@/lib/errorReporting";
 import type { AnalyzeOut, Document } from "@/lib/types";
 
@@ -57,6 +58,10 @@ export function DocumentsTab() {
   const notify = useNotify();
   const [docs, setDocs] = useState<Document[]>([]);
   const [error, setError] = useState<string | null>(null);
+  // The document list runs an explicit loading -> (empty | data) machine so the
+  // "No documents yet." copy never shows before the first fetch has resolved.
+  const [listError, setListError] = useState<string | null>(null);
+  const [loadState, setLoadState] = useState<"loading" | "ready">("loading");
 
   // ── Upload (primary path) ──────────────────────────────────────────────────
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -76,10 +81,12 @@ export function DocumentsTab() {
   const refresh = useCallback(
     async (signal?: AbortSignal) => {
       try {
-        setDocs(await api.listDocuments(signal));
+        const data = await api.listDocuments(signal);
+        setDocs(data);
+        setListError(null);
       } catch (err) {
         if (!signal?.aborted) {
-          setError(
+          setListError(
             err instanceof ApiError ? err.detail : "Failed to load documents.",
           );
           void reportAndNotify({
@@ -89,6 +96,8 @@ export function DocumentsTab() {
             notify,
           });
         }
+      } finally {
+        if (!signal?.aborted) setLoadState("ready");
       }
     },
     [api, notify],
@@ -121,6 +130,19 @@ export function DocumentsTab() {
   function resetFileInput() {
     setFile(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  /** Empty-state CTA: jump straight to the file picker (the primary action). */
+  function focusUpload() {
+    fileInputRef.current?.focus();
+    fileInputRef.current?.click();
+  }
+
+  /** "Try again" on a failed list load: re-show the skeleton, then re-fetch. */
+  function retryLoad() {
+    setListError(null);
+    setLoadState("loading");
+    void refresh();
   }
 
   async function onUpload(e: React.FormEvent) {
@@ -225,7 +247,7 @@ export function DocumentsTab() {
         <h2 id="doc-add-heading">Add a document</h2>
         <p className="hint">
           Upload a PDF, Word (.doc/.docx) or .txt file (max {MAX_FILE_MB} MB).
-          The file is stored securely and added to the document brain.
+          The file is stored securely and added to your documents.
         </p>
         <form onSubmit={onUpload}>
           <label>
@@ -246,7 +268,7 @@ export function DocumentsTab() {
             </p>
           )}
           <button className="btn" type="submit" disabled={uploading || !file}>
-            {uploading ? "Uploading…" : "Upload to document brain"}
+            {uploading ? "Uploading…" : "Upload document"}
           </button>
         </form>
         <div id="doc-upload-status" aria-live="polite">
@@ -305,7 +327,7 @@ export function DocumentsTab() {
                 {analyzing ? "Analyzing…" : "Analyze"}
               </button>
               <button className="btn" type="submit" disabled={pasteBusy}>
-                {pasteBusy ? "Saving…" : "Save to document brain"}
+                {pasteBusy ? "Saving…" : "Save to your documents"}
               </button>
             </div>
           </form>
@@ -319,9 +341,18 @@ export function DocumentsTab() {
         </details>
       </section>
       <section className="panel" aria-labelledby="doc-list-heading">
-        <h2 id="doc-list-heading">Document brain</h2>
-        {docs.length === 0 ? (
-          <p className="hint">No documents yet.</p>
+        <h2 id="doc-list-heading">Your documents</h2>
+        {loadState === "loading" ? (
+          <SkeletonList />
+        ) : listError ? (
+          <RetryableError message={listError} onRetry={retryLoad} />
+        ) : docs.length === 0 ? (
+          <div className="empty-state">
+            <p className="hint">No documents yet.</p>
+            <button className="btn" type="button" onClick={focusUpload}>
+              Upload your first document
+            </button>
+          </div>
         ) : (
           docs.map((d) => (
             <div key={d.id} className="list-row">
