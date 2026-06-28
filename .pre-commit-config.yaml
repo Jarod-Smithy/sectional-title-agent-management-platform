@@ -82,6 +82,21 @@ repos:
     hooks:
       - id: terraform_fmt
 
+  # ── Dockerfiles: lint (mirrors the CI Checkov dockerfile framework) ───
+  # hadolint-py vendors the hadolint binary as a self-contained pip wheel
+  # (no Docker daemon / system binary), matching the "no dead binary" stance.
+  - repo: https://github.com/AleksaC/hadolint-py
+    rev: v2.12.1-beta
+    hooks:
+      - id: hadolint
+        files: (?:^|/)Dockerfile(?:\..+)?$
+
+  # ── Shell: static analysis (shellcheck-py vendors the binary as a wheel) ─
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.10.0.1
+    hooks:
+      - id: shellcheck
+
   # ── SAST on staged changes ───────────────────────────────────────────
   - repo: https://github.com/semgrep/semgrep
     rev: v1.83.0
@@ -97,6 +112,8 @@ repos:
             "p/ci",
             "--config",
             "p/secrets",
+            "--config",
+            "p/owasp-top-ten",
             "--error",
             "--skip-unknown-extensions",
           ]
