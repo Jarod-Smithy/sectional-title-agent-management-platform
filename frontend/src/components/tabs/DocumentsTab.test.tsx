@@ -1,73 +1,73 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { http, HttpResponse } from "msw";
-import { beforeEach, describe, expect, it } from "vitest";
-import { DocumentsTab } from "./DocumentsTab";
-import { config } from "@/lib/config";
-import { AuthProvider } from "@/lib/auth";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ApiError, type ApiClient } from "@/lib/api";
 import { NotificationProvider } from "@/components/Notifications";
 import { resetReportedSignatures } from "@/lib/errorReporting";
-import { server } from "@/test/msw/server";
 
-const base = config.apiBase;
+// The API is injected at its `useApi` seam so this integration test is fully
+// deterministic — no network or auth-provider timing (the source of CI-only
+// flakiness). The component, NotificationProvider, reportAndNotify and the toast
+// are all REAL; only the API boundary is stubbed: the upload fails and the SDLC
+// endpoint opens a tracked issue.
+const api = vi.hoisted(() => ({
+  listDocuments: vi.fn(),
+  requestDocumentUploadUrl: vi.fn(),
+  reportBug: vi.fn(),
+}));
 
-/** Renders the real tab inside the real providers — only the network is stubbed. */
-function renderTab() {
-  return render(
-    <NotificationProvider>
-      <AuthProvider>
-        <DocumentsTab />
-      </AuthProvider>
-    </NotificationProvider>,
-  );
-}
+vi.mock("@/lib/useApi", () => ({
+  useApi: () => api as unknown as ApiClient,
+}));
+
+import { DocumentsTab } from "./DocumentsTab";
 
 describe("DocumentsTab — global error capture", () => {
-  beforeEach(() => resetReportedSignatures());
+  beforeEach(() => {
+    resetReportedSignatures();
+    vi.clearAllMocks();
+    api.listDocuments.mockResolvedValue([]);
+    api.requestDocumentUploadUrl.mockRejectedValue(
+      new ApiError(500, "Upload failed."),
+    );
+    api.reportBug.mockResolvedValue({
+      number: 42,
+      url: "https://github.com/acme/repo/issues/42",
+      created: true,
+    });
+  });
 
   it("files a bug and shows the AI-notified toast with a tracking link when an upload fails", async () => {
     const user = userEvent.setup();
-    server.use(
-      // The upload pipeline fails at its first network step…
-      http.post(`${base}/api/documents/upload-url`, () =>
-        HttpResponse.json({ detail: "Upload failed." }, { status: 500 }),
-      ),
-      // …and the SDLC endpoint opens a tracked GitHub issue.
-      http.post(`${base}/api/report-bug`, () =>
-        HttpResponse.json({
-          number: 42,
-          url: "https://github.com/acme/repo/issues/42",
-          created: true,
-        }),
-      ),
+    render(
+      <NotificationProvider>
+        <DocumentsTab />
+      </NotificationProvider>,
     );
-
-    renderTab();
 
     const file = new File(["hello"], "rules.txt", { type: "text/plain" });
-    await user.upload(screen.getByLabelText(/^file$/i), file);
-    await user.click(
-      screen.getByRole("button", { name: /upload to document brain/i }),
-    );
+    const input = screen.getByLabelText(/^file$/i);
+    await user.upload(input, file);
+    // Submit the form directly: jsdom's constraint validation for a `required`
+    // file input doesn't recognise files set via userEvent, so a submit-button
+    // click is suppressed. fireEvent.submit faithfully drives the real onSubmit
+    // handler (a valid file passes validation in a real browser).
+    fireEvent.submit(input.closest("form")!);
 
-    // Global toast: reassuring copy + a clickable link to track the issue.
-    // The report is filed by a fire-and-forget `void reportAndNotify(...)`, so
-    // the toast appears asynchronously after the round-trip — wait for it
-    // explicitly rather than relying on the 1s default (CI runs every suite in
-    // parallel, where the default can be exceeded).
+    // The upload was attempted and its failure was filed as a single bug…
+    await waitFor(() =>
+      expect(api.requestDocumentUploadUrl).toHaveBeenCalledTimes(1),
+    );
+    await waitFor(() => expect(api.reportBug).toHaveBeenCalledTimes(1));
+
+    // …and the user sees the reassuring toast with a link to track the issue.
     expect(
       await screen.findByText(
         /our AI engineers have automatically been notified/i,
-        undefined,
-        { timeout: 5000 },
       ),
     ).toBeInTheDocument();
     expect(
-      await screen.findByRole(
-        "link",
-        { name: /track issue #42/i },
-        { timeout: 5000 },
-      ),
+      screen.getByRole("link", { name: /track issue #42/i }),
     ).toHaveAttribute("href", "https://github.com/acme/repo/issues/42");
   });
 });
