@@ -155,6 +155,33 @@ def test_build_document_store_returns_adapter_with_bucket() -> None:
     assert isinstance(store, S3DocumentStore)
 
 
+def test_build_document_store_presigns_regional_virtual_hosted_url(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Presigned PUT URLs must use the regional virtual-hosted endpoint.
+
+    boto3 defaults to the global ``s3.amazonaws.com`` endpoint which is blocked
+    by the CloudFront CSP (connect-src only allows *.s3.<region>.amazonaws.com).
+    The fix is ``addressing_style='virtual'`` on the S3 client config, which
+    produces ``https://<bucket>.s3.<region>.amazonaws.com/...`` URLs.
+    """
+    # Presigning is offline but still signs with SigV4, so it needs credentials.
+    # Provide static dummy creds and clear any inherited refreshable-credential
+    # markers so botocore does not try (and fail) to refresh real credentials.
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "testing")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "testing")
+    monkeypatch.delenv("AWS_SESSION_TOKEN", raising=False)
+    monkeypatch.delenv("AWS_CREDENTIAL_EXPIRATION", raising=False)
+    store = build_document_store(
+        Settings(documents_bucket="my-docs-bucket", documents_region="af-south-1")
+    )
+    assert isinstance(store, S3DocumentStore)
+    url = store.presign_put(key="test.pdf", content_type="application/pdf", expires_in=300)
+    # Must be virtual-hosted regional form, NOT the global s3.amazonaws.com endpoint.
+    assert "my-docs-bucket.s3.af-south-1.amazonaws.com" in url
+    assert "s3.amazonaws.com/" not in url
+
+
 def test_documents_resolved_region_prefers_explicit_then_falls_back() -> None:
     assert Settings(documents_region="eu-west-1").documents_resolved_region == "eu-west-1"
     fallback = Settings(documents_region="", aws_region="af-south-1")

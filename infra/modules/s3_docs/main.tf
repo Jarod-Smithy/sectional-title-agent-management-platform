@@ -66,7 +66,7 @@ resource "aws_s3_bucket_cors_configuration" "docs" {
   bucket = aws_s3_bucket.docs.id
 
   cors_rule {
-    allowed_methods = ["PUT", "GET"]
+    allowed_methods = ["PUT", "GET", "HEAD"]
     allowed_origins = var.allowed_origins
     allowed_headers = ["*"]
     expose_headers  = ["ETag"]
