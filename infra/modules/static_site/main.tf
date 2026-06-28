@@ -59,7 +59,8 @@ data "aws_cloudfront_cache_policy" "optimized" {
 
 # ── Security response headers ────────────────────────────────────────────────
 # Pragmatic CSP: allow the SPA to load its own assets and call the af-south-1
-# HTTP API + Cognito over connect-src. 'unsafe-inline' is permitted for script
+# HTTP API + Cognito over connect-src, plus presigned PUT/GET to the af-south-1
+# S3 documents bucket (browser uploads). 'unsafe-inline' is permitted for script
 # and style because Next's static export inlines hydration scripts and styled
 # chunks; tightening to nonces/hashes is a prod-hardening follow-up.
 resource "aws_cloudfront_response_headers_policy" "security" {
@@ -91,7 +92,7 @@ resource "aws_cloudfront_response_headers_policy" "security" {
       override = true
       content_security_policy = join(" ", [
         "default-src 'self';",
-        "connect-src 'self' https://*.execute-api.af-south-1.amazonaws.com https://cognito-idp.af-south-1.amazonaws.com;",
+        "connect-src 'self' https://*.execute-api.af-south-1.amazonaws.com https://cognito-idp.af-south-1.amazonaws.com https://*.s3.af-south-1.amazonaws.com;",
         "img-src 'self' data:;",
         "script-src 'self' 'unsafe-inline';",
         "style-src 'self' 'unsafe-inline';",
