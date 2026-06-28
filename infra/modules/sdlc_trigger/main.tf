@@ -85,6 +85,12 @@ resource "aws_iam_role_policy_attachment" "logs" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
+# X-Ray write permissions for active tracing (enabled on the function below).
+resource "aws_iam_role_policy_attachment" "xray" {
+  role       = aws_iam_role.exec.name
+  policy_arn = "arn:aws:iam::aws:policy/AWSXRayDaemonWriteAccess"
+}
+
 data "aws_iam_policy_document" "perms" {
   statement {
     sid    = "InvokeHarness"
@@ -147,6 +153,11 @@ resource "aws_lambda_function" "trigger" {
       SELF_FUNCTION_NAME  = local.function_name
       TRIGGER_LABEL       = var.trigger_label
     }
+  }
+
+  # End-to-end request tracing (X-Ray). Permissions attached above.
+  tracing_config {
+    mode = "Active"
   }
 
   tags = var.tags
