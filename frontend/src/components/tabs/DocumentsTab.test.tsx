@@ -51,13 +51,23 @@ describe("DocumentsTab — global error capture", () => {
     );
 
     // Global toast: reassuring copy + a clickable link to track the issue.
+    // The report is filed by a fire-and-forget `void reportAndNotify(...)`, so
+    // the toast appears asynchronously after the round-trip — wait for it
+    // explicitly rather than relying on the 1s default (CI runs every suite in
+    // parallel, where the default can be exceeded).
     expect(
       await screen.findByText(
         /our AI engineers have automatically been notified/i,
+        undefined,
+        { timeout: 5000 },
       ),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: /track issue #42/i }),
+      await screen.findByRole(
+        "link",
+        { name: /track issue #42/i },
+        { timeout: 5000 },
+      ),
     ).toHaveAttribute("href", "https://github.com/acme/repo/issues/42");
   });
 });
