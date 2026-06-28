@@ -51,3 +51,4 @@ cdk.out/
 Thumbs.db
 .idea/
 *.swp
+infra/modules/sdlc_trigger/build/
