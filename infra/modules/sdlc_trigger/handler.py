@@ -1,0 +1,107 @@
+"""GitHub webhook -> Amazon Bedrock AgentCore SDLC harness trigger.
+
+API Gateway invokes this Lambda on a GitHub ``issues`` webhook. The function:
+
+1. Verifies the GitHub HMAC-SHA256 signature (``X-Hub-Signature-256``) against a
+   shared secret held in Secrets Manager.
+2. When an issue is labelled ``ai-sdlc`` (action labeled/opened/reopened), it
+   asynchronously self-invokes (``InvocationType=Event``) so it can ACK GitHub
+   within the webhook timeout, and the async copy runs the harness.
+3. The async ``_worker`` path calls ``bedrock-agentcore:InvokeHarness`` with the
+   issue as the user message and drains the response stream.
+
+Only ``boto3`` is used (present in the Lambda runtime) — no extra dependencies.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import hmac
+import json
+import os
+import uuid
+from typing import Any
+
+import boto3
+from botocore.config import Config
+
+HARNESS_ARN = os.environ["HARNESS_ARN"]
+WEBHOOK_SECRET_NAME = os.environ["WEBHOOK_SECRET_NAME"]
+SELF_FUNCTION_NAME = os.environ["SELF_FUNCTION_NAME"]
+TRIGGER_LABEL = os.environ.get("TRIGGER_LABEL", "ai-sdlc")
+
+_secrets = boto3.client("secretsmanager")
+_lambda = boto3.client("lambda")
+# The harness streams for minutes; keep the socket open well within the Lambda's
+# 15-minute ceiling and disable retries (a partial stream must not be replayed).
+_agent = boto3.client(
+    "bedrock-agentcore",
+    config=Config(read_timeout=870, connect_timeout=10, retries={"max_attempts": 0}),
+)
+
+
+def _webhook_secret() -> bytes:
+    return _secrets.get_secret_value(SecretId=WEBHOOK_SECRET_NAME)["SecretString"].strip().encode()
+
+
+def _ack(status: int, message: str) -> dict[str, Any]:
+    return {"statusCode": status, "body": json.dumps({"message": message})}
+
+
+def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
+    # Async worker path: actually run the agent (can take minutes).
+    if event.get("_worker"):
+        return _run_agent(event["issue"])
+
+    headers = {k.lower(): v for k, v in (event.get("headers") or {}).items()}
+    body = event.get("body") or ""
+    signature = headers.get("x-hub-signature-256", "")
+    expected = "sha256=" + hmac.new(_webhook_secret(), body.encode(), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(signature, expected):
+        return _ack(401, "invalid signature")
+
+    if headers.get("x-github-event") != "issues":
+        return _ack(204, "ignored (not an issues event)")
+    payload = json.loads(body or "{}")
+    if payload.get("action") not in ("labeled", "opened", "reopened"):
+        return _ack(204, "ignored (action not actionable)")
+    issue = payload.get("issue") or {}
+    labels = [label.get("name") for label in issue.get("labels", [])]
+    if TRIGGER_LABEL not in labels:
+        return _ack(204, f"ignored (no '{TRIGGER_LABEL}' label)")
+
+    _lambda.invoke(
+        FunctionName=SELF_FUNCTION_NAME,
+        InvocationType="Event",
+        Payload=json.dumps(
+            {
+                "_worker": True,
+                "issue": {
+                    "number": issue.get("number"),
+                    "title": issue.get("title") or "",
+                    "body": issue.get("body") or "",
+                    "labels": labels,
+                },
+            }
+        ).encode(),
+    )
+    return _ack(202, f"dispatched issue #{issue.get('number')} to the SDLC agent")
+
+
+def _run_agent(issue: dict[str, Any]) -> dict[str, Any]:
+    message = (
+        f"GitHub issue #{issue['number']} (labels: {', '.join(issue['labels'])}).\n"
+        f"Title: {issue['title']}\n\n{issue['body']}"
+    )
+    response = _agent.invoke_harness(
+        harnessArn=HARNESS_ARN,
+        runtimeSessionId=f"ai-sdlc-issue-{issue['number']}-{uuid.uuid4().hex}",
+        messages=[{"role": "user", "content": [{"text": message}]}],
+    )
+    stop_reason = "unknown"
+    for chunk in response["stream"]:
+        if "messageStop" in chunk:
+            stop_reason = chunk["messageStop"].get("stopReason", stop_reason)
+        elif "runtimeClientError" in chunk:
+            return {"ok": False, "error": chunk["runtimeClientError"].get("message")}
+    return {"ok": True, "issue": issue["number"], "stopReason": stop_reason}
