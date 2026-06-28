@@ -88,10 +88,22 @@ def build_document_store(settings: Settings) -> DocumentStore | None:
     if not settings.documents_bucket:
         return None
     import boto3
+    from botocore.config import Config
 
     from app.adapters.s3_documents import S3DocumentStore
 
-    client = boto3.client("s3", region_name=settings.documents_resolved_region)
+    # Force virtual-hosted-style addressing so presigned PUT URLs take the form
+    # https://<bucket>.s3.<region>.amazonaws.com/... rather than the global
+    # https://<bucket>.s3.amazonaws.com/... that boto3 emits by default.
+    # The regional form is required for two reasons:
+    #   1. The CloudFront CSP connect-src only allows *.s3.<region>.amazonaws.com.
+    #   2. The S3 CORS rule lives on the bucket in <region>; the global endpoint
+    #      may not honour it, causing the browser preflight to fail.
+    client = boto3.client(
+        "s3",
+        region_name=settings.documents_resolved_region,
+        config=Config(s3={"addressing_style": "virtual"}),
+    )
     return S3DocumentStore(client=client, bucket=settings.documents_bucket)
 
 

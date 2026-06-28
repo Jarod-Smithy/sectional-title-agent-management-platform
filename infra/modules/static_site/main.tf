@@ -92,7 +92,7 @@ resource "aws_cloudfront_response_headers_policy" "security" {
       override = true
       content_security_policy = join(" ", [
         "default-src 'self';",
-        "connect-src 'self' https://*.execute-api.af-south-1.amazonaws.com https://cognito-idp.af-south-1.amazonaws.com https://*.s3.af-south-1.amazonaws.com;",
+        "connect-src 'self' https://*.execute-api.af-south-1.amazonaws.com https://cognito-idp.af-south-1.amazonaws.com https://*.s3.af-south-1.amazonaws.com https://*.s3.amazonaws.com;",
         "img-src 'self' data:;",
         "script-src 'self' 'unsafe-inline';",
         "style-src 'self' 'unsafe-inline';",
