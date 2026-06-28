@@ -157,6 +157,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const pool = newPool();
     const current = pool.getCurrentUser();
     if (!current) {
+      // No stored session: mark auth ready synchronously on first load.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setReady(true);
       return;
     }
