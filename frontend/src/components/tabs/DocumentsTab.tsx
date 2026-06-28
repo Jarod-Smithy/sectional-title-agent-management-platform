@@ -96,6 +96,9 @@ export function DocumentsTab() {
 
   useEffect(() => {
     const ctrl = new AbortController();
+    // refresh() only calls setState after an awaited fetch (no synchronous
+    // setState in the effect body), so this on-mount load is intentional.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void refresh(ctrl.signal);
     return () => ctrl.abort();
   }, [refresh]);
