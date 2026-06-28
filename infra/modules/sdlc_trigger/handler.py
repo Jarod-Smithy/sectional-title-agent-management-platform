@@ -31,6 +31,12 @@ HARNESS_ARN = os.environ["HARNESS_ARN"]
 WEBHOOK_SECRET_NAME = os.environ["WEBHOOK_SECRET_NAME"]
 SELF_FUNCTION_NAME = os.environ["SELF_FUNCTION_NAME"]
 TRIGGER_LABEL = os.environ.get("TRIGGER_LABEL", "ai-sdlc")
+# Dedup: GitHub fires opened+labeled (and reopened) for the same issue within
+# seconds, which would race two agent runs. A conditional PutItem keyed by issue
+# number lets only the first event in this window dispatch the worker. Short
+# enough that a deliberate manual re-trigger still works after a minute or two.
+DEDUP_TABLE = os.environ.get("DEDUP_TABLE", "")
+_DEDUP_TTL_SECONDS = 180
 # Bedrock can throttle the harness's ConverseStream under load (e.g. when GitHub
 # fires opened+labeled and two runs race). Retry the whole run a few times with
 # exponential backoff so a transient ThrottlingException doesn't drop the issue.
@@ -39,6 +45,7 @@ _BACKOFF_BASE_SECONDS = 20
 
 _secrets = boto3.client("secretsmanager")
 _lambda = boto3.client("lambda")
+_dynamodb = boto3.client("dynamodb")
 # The harness streams for minutes; keep the socket open well within the Lambda's
 # 15-minute ceiling and disable retries (a partial stream must not be replayed).
 _agent = boto3.client(
@@ -53,6 +60,30 @@ def _webhook_secret() -> bytes:
 
 def _ack(status: int, message: str) -> dict[str, Any]:
     return {"statusCode": status, "body": json.dumps({"message": message})}
+
+
+def _claim_issue(number: Any) -> bool:
+    """Win the dispatch race for an issue. True = this event should dispatch.
+
+    Conditional PutItem: succeeds only when no live claim exists (or the prior
+    claim's TTL has logically passed — DynamoDB's physical TTL sweep can lag).
+    Fail-open: if the table is unset or DynamoDB errors, allow the dispatch.
+    """
+    if not DEDUP_TABLE or number is None:
+        return True
+    now = int(time.time())
+    try:
+        _dynamodb.put_item(
+            TableName=DEDUP_TABLE,
+            Item={"issue": {"S": str(number)}, "expires_at": {"N": str(now + _DEDUP_TTL_SECONDS)}},
+            ConditionExpression="attribute_not_exists(issue) OR expires_at < :now",
+            ExpressionAttributeValues={":now": {"N": str(now)}},
+        )
+        return True
+    except _dynamodb.exceptions.ConditionalCheckFailedException:
+        return False
+    except (ClientError, BotoCoreError):
+        return True
 
 
 def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
@@ -76,6 +107,10 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     labels = [label.get("name") for label in issue.get("labels", [])]
     if TRIGGER_LABEL not in labels:
         return _ack(204, f"ignored (no '{TRIGGER_LABEL}' label)")
+
+    # Collapse GitHub's opened+labeled double-fire: only the first event wins.
+    if not _claim_issue(issue.get("number")):
+        return _ack(202, f"deduplicated issue #{issue.get('number')} (already dispatched)")
 
     _lambda.invoke(
         FunctionName=SELF_FUNCTION_NAME,
