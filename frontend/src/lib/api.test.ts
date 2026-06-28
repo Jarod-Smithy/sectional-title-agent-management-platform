@@ -1,4 +1,4 @@
-import { http, HttpResponse } from "msw";
+import { delay, http, HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
 import { ApiClient, ApiError } from "./api";
 import { config } from "./config";
@@ -125,6 +125,43 @@ describe("ApiClient", () => {
     const err = new ApiError(500, "boom");
     expect(err).toBeInstanceOf(Error);
     expect(err.message).toBe("API 500: boom");
+  });
+});
+
+describe("ApiClient — connectivity + timeouts", () => {
+  it("normalises a dropped/offline connection to a connectivity ApiError(0)", async () => {
+    server.use(http.get(`${base}/api/documents`, () => HttpResponse.error()));
+    const api = new ApiClient(() => "token");
+    const err = await api.listDocuments().catch((e: unknown) => e);
+    expect(err).toMatchObject({ name: "ApiError", status: 0 });
+    expect((err as ApiError).detail).toMatch(/offline/i);
+  });
+
+  it("times out a slow read and surfaces a connectivity ApiError(0)", async () => {
+    server.use(
+      http.get(`${base}/api/documents`, async () => {
+        await delay(200);
+        return HttpResponse.json([]);
+      }),
+    );
+    // A 20ms deadline guarantees the timeout fires before the 200ms handler.
+    const api = new ApiClient(() => "token", undefined, { readTimeoutMs: 20 });
+    const err = await api.listDocuments().catch((e: unknown) => e);
+    expect(err).toMatchObject({ name: "ApiError", status: 0 });
+    expect((err as ApiError).detail).toMatch(/longer than expected/i);
+  });
+
+  it("does not swallow a genuine HTTP error as a connectivity failure", async () => {
+    server.use(
+      http.get(`${base}/api/documents`, () =>
+        HttpResponse.json({ detail: "Server boom" }, { status: 500 }),
+      ),
+    );
+    const api = new ApiClient(() => "token");
+    await expect(api.listDocuments()).rejects.toMatchObject({
+      name: "ApiError",
+      status: 500,
+    });
   });
 });
 

@@ -14,7 +14,7 @@ describe("AskTab", () => {
     renderWithAuth(<AskTab />);
 
     await user.type(screen.getByRole("textbox"), "What are the quiet hours?");
-    await user.click(screen.getByRole("button", { name: /ask/i }));
+    await user.click(screen.getByRole("button", { name: "Ask" }));
 
     expect(
       await screen.findByText(/Quiet hours are 22:00/),
