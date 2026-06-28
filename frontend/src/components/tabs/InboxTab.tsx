@@ -5,10 +5,13 @@ import { ApiError } from "@/lib/api";
 import { SeverityChip } from "@/components/StatusChip";
 import { config } from "@/lib/config";
 import { useApi } from "@/lib/useApi";
+import { useNotify } from "@/components/Notifications";
+import { reportAndNotify } from "@/lib/errorReporting";
 import type { Draft } from "@/lib/types";
 
 export function InboxTab() {
   const api = useApi();
+  const notify = useNotify();
   const [sender, setSender] = useState("owner.surname@gmail.com");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
@@ -26,10 +29,16 @@ export function InboxTab() {
           setError(
             err instanceof ApiError ? err.detail : "Failed to load drafts.",
           );
+          void reportAndNotify({
+            error: err,
+            context: "inbox.load",
+            api,
+            notify,
+          });
         }
       }
     },
-    [api],
+    [api, notify],
   );
 
   useEffect(() => {
@@ -58,6 +67,12 @@ export function InboxTab() {
       setError(
         err instanceof ApiError ? err.detail : "Failed to process email.",
       );
+      void reportAndNotify({
+        error: err,
+        context: "inbox.process",
+        api,
+        notify,
+      });
     } finally {
       setBusy(false);
     }
@@ -69,6 +84,12 @@ export function InboxTab() {
       await refresh();
     } catch (err) {
       setError(err instanceof ApiError ? err.detail : "Could not file draft.");
+      void reportAndNotify({
+        error: err,
+        context: "inbox.approve",
+        api,
+        notify,
+      });
     }
   }
 
@@ -80,6 +101,12 @@ export function InboxTab() {
       setError(
         err instanceof ApiError ? err.detail : "Could not discard draft.",
       );
+      void reportAndNotify({
+        error: err,
+        context: "inbox.discard",
+        api,
+        notify,
+      });
     }
   }
 

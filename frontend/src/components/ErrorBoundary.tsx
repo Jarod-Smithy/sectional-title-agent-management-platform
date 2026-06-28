@@ -2,12 +2,20 @@
 
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import type { BugReportIn, IssueCreatedOut } from "@/lib/types";
+import type { Notify } from "@/components/Notifications";
+import { FALLBACK_COPY, NOTIFIED_COPY } from "@/lib/errorReporting";
 
 type FileState = "idle" | "filing" | "done" | "failed";
 
 interface Props {
   /** Files the captured error; injected so the boundary stays unit-testable. */
   report: (payload: BugReportIn) => Promise<IssueCreatedOut>;
+  /**
+   * Optional global notifier. When supplied, the boundary surfaces the same
+   * "AI engineers notified" toast (with a tracking link when one is available)
+   * in addition to its inline fallback UI. Injected so it stays testable.
+   */
+  notify?: Notify;
   children: ReactNode;
 }
 
@@ -42,13 +50,25 @@ export class ErrorBoundary extends Component<Props, State> {
     };
     this.props
       .report(payload)
-      .then((out) =>
+      .then((out) => {
         this.setState({
           filed: "done",
           issueUrl: out.created ? out.url : null,
-        }),
-      )
-      .catch(() => this.setState({ filed: "failed" }));
+        });
+        if (out.created && out.url) {
+          this.props.notify?.({
+            severity: "error",
+            message: NOTIFIED_COPY,
+            action: { label: `Track issue #${out.number}`, href: out.url },
+          });
+        } else {
+          this.props.notify?.({ severity: "error", message: FALLBACK_COPY });
+        }
+      })
+      .catch(() => {
+        this.setState({ filed: "failed" });
+        this.props.notify?.({ severity: "error", message: FALLBACK_COPY });
+      });
   }
 
   private readonly reset = (): void =>

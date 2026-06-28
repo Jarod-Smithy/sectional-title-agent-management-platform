@@ -98,4 +98,9 @@ export const handlers = [
   http.get(`${base}/api/resolutions`, () => HttpResponse.json([])),
   http.get(`${base}/api/drafts`, () => HttpResponse.json([])),
   http.post(`${base}/api/ask`, () => HttpResponse.json(askAnswer)),
+  // Default SDLC bug-report sink: behaves like the offline tracker (no live
+  // issue). Tests that exercise the "issue created" path override this.
+  http.post(`${base}/api/report-bug`, () =>
+    HttpResponse.json({ number: 0, url: "log:not-created", created: false }),
+  ),
 ];

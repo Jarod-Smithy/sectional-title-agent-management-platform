@@ -3,9 +3,12 @@
 import { useState } from "react";
 import { ApiError } from "@/lib/api";
 import { useApi } from "@/lib/useApi";
+import { useNotify } from "@/components/Notifications";
+import { reportAndNotify } from "@/lib/errorReporting";
 
 export function RequestTab() {
   const api = useApi();
+  const notify = useNotify();
   const [title, setTitle] = useState("");
   const [details, setDetails] = useState("");
   const [busy, setBusy] = useState(false);
@@ -29,6 +32,12 @@ export function RequestTab() {
           ? err.detail
           : "Could not submit the feature request.",
       );
+      void reportAndNotify({
+        error: err,
+        context: "request.submit",
+        api,
+        notify,
+      });
     } finally {
       setBusy(false);
     }

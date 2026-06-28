@@ -26,8 +26,12 @@ def format_bug_report(
 ) -> tuple[str, str]:
     """Return ``(title, body)`` for a captured client-side error.
 
-    The title is a single clipped line so GitHub de-dupes visually; the body is
-    Markdown with the stack and environment fenced for readability.
+    The title is a STABLE, deterministic function of ``message`` alone — a
+    single clipped ``[bug] <summary>`` line with NO timestamps, ids or other
+    volatile data. This is load-bearing: the GitHub adapter de-dupes recurring
+    errors by exact title match, so identical errors MUST yield identical
+    titles. All volatile detail (stack, url, user agent, timestamps) lives in
+    the body instead.
     """
     summary = _clip(message, _MAX_TITLE - len("[bug] ")) or "Unhandled client error"
     title = f"[bug] {summary}"

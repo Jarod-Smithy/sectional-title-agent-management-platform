@@ -355,6 +355,10 @@ def report_bug(payload: BugReportIn, request: Request) -> IssueCreatedOut:
         )
     except IssueTrackerError as exc:
         raise HTTPException(status_code=502, detail="Could not file the bug report.") from exc
+    # ``created`` means "tracked", not necessarily "freshly opened": when the
+    # GitHub adapter de-dupes a recurring error it returns the EXISTING open
+    # issue's ``number``/``url`` (number > 0), so the dashboard still gets a
+    # working tracking link. Only the offline log tracker yields number == 0.
     return IssueCreatedOut(number=ref.number, url=ref.url, created=ref.number > 0)
 
 

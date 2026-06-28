@@ -3,10 +3,13 @@
 import { useEffect, useState } from "react";
 import { ApiError } from "@/lib/api";
 import { useApi } from "@/lib/useApi";
+import { useNotify } from "@/components/Notifications";
+import { reportAndNotify } from "@/lib/errorReporting";
 import type { Resolution } from "@/lib/types";
 
 export function ResolutionsTab() {
   const api = useApi();
+  const notify = useNotify();
   const [resolutions, setResolutions] = useState<Resolution[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -22,10 +25,16 @@ export function ResolutionsTab() {
               ? err.detail
               : "Failed to load resolutions.",
           );
+          void reportAndNotify({
+            error: err,
+            context: "resolutions.load",
+            api,
+            notify,
+          });
         }
       });
     return () => ctrl.abort();
-  }, [api]);
+  }, [api, notify]);
 
   return (
     <section className="panel" aria-labelledby="res-heading">

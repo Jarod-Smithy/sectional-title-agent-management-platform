@@ -51,4 +51,10 @@ inputs = {
   github_repo     = "Jarod-Smithy/sectional-title-agent-management-platform"
   approver_email  = "jarod.mark.smith@gmail.com"
   public_base_url = "https://f29y0n9h2d.execute-api.af-south-1.amazonaws.com"
+
+  # Browser origins allowed to call the API (FastAPI CORS) and to PUT documents
+  # straight to S3 via presigned URLs. The live dashboard is served from this
+  # CloudFront distribution; localhost stays for local dev against the live API.
+  cors_allow_origins        = ["https://d2vcnwv2hywkdo.cloudfront.net", "http://localhost:8000", "http://localhost:3000"]
+  documents_allowed_origins = ["https://d2vcnwv2hywkdo.cloudfront.net", "http://localhost:8000", "http://localhost:3000"]
 }
