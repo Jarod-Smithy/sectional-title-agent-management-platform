@@ -1,0 +1,5 @@
+# hadolint config. DL3013 (pin pip versions) is ignored because Python
+# dependency pinning is owned by the project's pyproject.toml / lockfile, not by
+# inline `pip install pkg==ver` in the Dockerfile. All other rules stay on.
+ignored:
+  - DL3013
