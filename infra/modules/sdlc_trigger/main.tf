@@ -63,6 +63,37 @@ resource "aws_secretsmanager_secret_version" "webhook" {
   secret_string = random_password.webhook.result
 }
 
+# ── Dedup table: collapse GitHub's opened+labeled double-fire ────────────────
+# GitHub fires BOTH `opened` and `labeled` when an issue is created with the
+# trigger label, which would otherwise spawn two concurrent agent runs (and the
+# Bedrock throttling we saw). A conditional PutItem keyed by issue number (with
+# a short TTL window) lets only the FIRST event dispatch the worker; DynamoDB
+# TTL reaps the rows so the table stays empty at rest (pay-per-request = ~$0).
+# Encrypted at rest with the free AWS-owned key; the dedup rows hold only issue
+# numbers (no PII), so a customer-managed KMS key (~$1/mo) isn't warranted here.
+# nosemgrep: terraform.aws.security.aws-dynamodb-table-unencrypted.aws-dynamodb-table-unencrypted
+resource "aws_dynamodb_table" "dedup" {
+  name         = "${var.name_prefix}-sdlc-dedup"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "issue"
+
+  attribute {
+    name = "issue"
+    type = "S"
+  }
+
+  ttl {
+    attribute_name = "expires_at"
+    enabled        = true
+  }
+
+  server_side_encryption {
+    enabled = true
+  }
+
+  tags = var.tags
+}
+
 # ── Execution role ───────────────────────────────────────────────────────────
 data "aws_iam_policy_document" "assume" {
   statement {
@@ -111,6 +142,12 @@ data "aws_iam_policy_document" "perms" {
     actions   = ["lambda:InvokeFunction"]
     resources = [local.function_arn]
   }
+  statement {
+    sid       = "DedupClaim"
+    effect    = "Allow"
+    actions   = ["dynamodb:PutItem"]
+    resources = [aws_dynamodb_table.dedup.arn]
+  }
 }
 
 resource "aws_iam_role_policy" "perms" {
@@ -152,6 +189,7 @@ resource "aws_lambda_function" "trigger" {
       WEBHOOK_SECRET_NAME = aws_secretsmanager_secret.webhook.name
       SELF_FUNCTION_NAME  = local.function_name
       TRIGGER_LABEL       = var.trigger_label
+      DEDUP_TABLE         = aws_dynamodb_table.dedup.name
     }
   }
 
