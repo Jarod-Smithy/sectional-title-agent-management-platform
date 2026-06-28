@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError } from "@/lib/api";
 import { useApi } from "@/lib/useApi";
+import { useNotify } from "@/components/Notifications";
+import { reportAndNotify } from "@/lib/errorReporting";
 import type { AnalyzeOut, Document } from "@/lib/types";
 
 const CATEGORIES = [
@@ -52,6 +54,7 @@ function validateFile(file: File): string | null {
 
 export function DocumentsTab() {
   const api = useApi();
+  const notify = useNotify();
   const [docs, setDocs] = useState<Document[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -79,10 +82,16 @@ export function DocumentsTab() {
           setError(
             err instanceof ApiError ? err.detail : "Failed to load documents.",
           );
+          void reportAndNotify({
+            error: err,
+            context: "documents.load",
+            api,
+            notify,
+          });
         }
       }
     },
-    [api],
+    [api, notify],
   );
 
   useEffect(() => {
@@ -137,6 +146,12 @@ export function DocumentsTab() {
       await refresh();
     } catch (err) {
       setError(err instanceof ApiError ? err.detail : "Upload failed.");
+      void reportAndNotify({
+        error: err,
+        context: "documents.upload",
+        api,
+        notify,
+      });
     } finally {
       setPhase("idle");
     }
@@ -157,6 +172,12 @@ export function DocumentsTab() {
       setError(
         err instanceof ApiError ? err.detail : "Failed to analyze content.",
       );
+      void reportAndNotify({
+        error: err,
+        context: "documents.analyze",
+        api,
+        notify,
+      });
     } finally {
       setAnalyzing(false);
     }
@@ -184,6 +205,12 @@ export function DocumentsTab() {
       setError(
         err instanceof ApiError ? err.detail : "Failed to save document.",
       );
+      void reportAndNotify({
+        error: err,
+        context: "documents.save",
+        api,
+        notify,
+      });
     } finally {
       setPasteBusy(false);
     }

@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import { ApiError } from "@/lib/api";
 import { StatusChip } from "@/components/StatusChip";
 import { useApi } from "@/lib/useApi";
+import { useNotify } from "@/components/Notifications";
+import { reportAndNotify } from "@/lib/errorReporting";
 import type { Ticket, TicketStatus } from "@/lib/types";
 
 const COLUMNS: TicketStatus[] = ["todo", "in_progress", "done"];
@@ -19,6 +21,7 @@ const NEXT: Partial<Record<TicketStatus, TicketStatus>> = {
 
 export function BoardTab() {
   const api = useApi();
+  const notify = useNotify();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [title, setTitle] = useState("");
   const [type, setType] = useState("general");
@@ -35,10 +38,16 @@ export function BoardTab() {
           setError(
             err instanceof ApiError ? err.detail : "Failed to load tasks.",
           );
+          void reportAndNotify({
+            error: err,
+            context: "board.load",
+            api,
+            notify,
+          });
         }
       }
     },
-    [api],
+    [api, notify],
   );
 
   useEffect(() => {
@@ -58,6 +67,7 @@ export function BoardTab() {
       await refresh();
     } catch (err) {
       setError(err instanceof ApiError ? err.detail : "Failed to add task.");
+      void reportAndNotify({ error: err, context: "board.add", api, notify });
     } finally {
       setBusy(false);
     }
@@ -71,6 +81,12 @@ export function BoardTab() {
       await refresh();
     } catch (err) {
       setError(err instanceof ApiError ? err.detail : "Failed to move task.");
+      void reportAndNotify({
+        error: err,
+        context: "board.advance",
+        api,
+        notify,
+      });
     }
   }
 

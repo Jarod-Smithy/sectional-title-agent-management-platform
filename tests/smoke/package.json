@@ -1,0 +1,19 @@
+{
+  "name": "stak-smoke-tests",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Post-deploy smoke tests that exercise the LIVE deployed STAK system over real HTTP (no mocking). Catches API Gateway/Lambda CORS preflight regressions.",
+  "type": "module",
+  "scripts": {
+    "smoke": "tsx smoke.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@aws-sdk/client-cognito-identity-provider": "^3.658.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
+    "@types/node": "^20.16.11"
+  }
+}

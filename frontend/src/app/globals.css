@@ -288,6 +288,45 @@ button.ghost:hover {
   background: var(--brand-tint);
   color: var(--accent-text);
 }
+.banner.success {
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+/* Global notification stack — pinned bottom-right above all content. */
+.toast-stack {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: min(420px, calc(100vw - 32px));
+}
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 0;
+  box-shadow: var(--shadow);
+}
+.toast-message {
+  flex: 1;
+}
+.toast-action {
+  font-weight: 600;
+  white-space: nowrap;
+}
+.toast-dismiss {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  padding: 0 2px;
+}
 
 .center-screen {
   min-height: 100vh;

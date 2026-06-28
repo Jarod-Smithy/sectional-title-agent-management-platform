@@ -3,10 +3,13 @@
 import { useState } from "react";
 import { ApiError } from "@/lib/api";
 import { useApi } from "@/lib/useApi";
+import { useNotify } from "@/components/Notifications";
+import { reportAndNotify } from "@/lib/errorReporting";
 import type { AskOut } from "@/lib/types";
 
 export function AskTab() {
   const api = useApi();
+  const notify = useNotify();
   const [question, setQuestion] = useState("");
   const [result, setResult] = useState<AskOut | null>(null);
   const [loading, setLoading] = useState(false);
@@ -21,6 +24,7 @@ export function AskTab() {
       setResult(await api.ask({ question }));
     } catch (err) {
       setError(err instanceof ApiError ? err.detail : "Something went wrong.");
+      void reportAndNotify({ error: err, context: "ask.submit", api, notify });
     } finally {
       setLoading(false);
     }

@@ -234,6 +234,11 @@ module "lambda_api" {
     STAK_APPROVER_EMAIL           = var.approver_email
     STAK_APPROVAL_SECRET          = var.approver_email != "" ? random_password.approval_secret[0].result : ""
     STAK_PUBLIC_BASE_URL          = var.public_base_url
+    # CORS allow-list for the FastAPI app (Starlette CORSMiddleware). Without
+    # this the Lambda falls back to its localhost-only default and rejects the
+    # CloudFront origin's preflight with 400, breaking every authenticated call
+    # from the dashboard. Encoded as JSON so pydantic-settings parses the tuple.
+    STAK_CORS_ALLOW_ORIGINS = jsonencode(var.cors_allow_origins)
   }
 }
 

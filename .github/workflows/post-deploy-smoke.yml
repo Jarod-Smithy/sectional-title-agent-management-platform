@@ -1,0 +1,58 @@
+# Post-deploy smoke test against the LIVE deployed STAK system.
+#
+# REAL HTTP ONLY (no mocking). Catches the class of bug where an API Gateway /
+# Lambda CORS preflight returns 400 "Disallowed CORS origin", which silently
+# breaks every browser call from the dashboard.
+#
+# Runs:
+#   - on demand (workflow_dispatch)
+#   - daily (cron) as an early-warning canary against the live URL
+#
+# Optional authenticated round-trip runs only when the SMOKE_USERNAME /
+# SMOKE_PASSWORD (+ optional SMOKE_COGNITO_*) secrets are present. When they are
+# absent the workflow still stays green because only the unauthenticated + CORS
+# checks are mandatory.
+
+name: Post-deploy smoke
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 06:00 UTC daily.
+    - cron: "0 6 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: post-deploy-smoke
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: Live smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install smoke-test dependencies
+        working-directory: tests/smoke
+        run: npm ci || npm install
+
+      - name: Run smoke test against live API
+        working-directory: tests/smoke
+        env:
+          # Live defaults are baked into the test; override here if needed.
+          SMOKE_API_BASE: ${{ vars.SMOKE_API_BASE }}
+          SMOKE_ORIGIN: ${{ vars.SMOKE_ORIGIN }}
+          # Optional authenticated round-trip (secrets are blank when unset, so
+          # the test SKIPs that check and the workflow stays green).
+          SMOKE_USERNAME: ${{ secrets.SMOKE_USERNAME }}
+          SMOKE_PASSWORD: ${{ secrets.SMOKE_PASSWORD }}
+          SMOKE_COGNITO_CLIENT_ID: ${{ secrets.SMOKE_COGNITO_CLIENT_ID }}
+          SMOKE_COGNITO_REGION: ${{ secrets.SMOKE_COGNITO_REGION }}
+        run: npm run smoke
